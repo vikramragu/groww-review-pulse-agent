@@ -19,12 +19,15 @@ calls. See [docs/architecture.md §1.1](docs/architecture.md).
 
 ## Status
 
-**Phases 0–2 complete.** Stages 1–4 run end to end: a review export is ingested,
-normalized, deduplicated, window-filtered, scrubbed of PII, and classified into the
-five-theme taxonomy.
+**Phases 0–3 complete.** Stages 1–8 run end to end: a review export is ingested,
+normalized, deduplicated, window-filtered, scrubbed of PII, classified into the
+five-theme taxonomy, ranked, drafted, gated, and rendered as a compliant one-page note.
 
-The note itself and MCP publishing arrive in Phases 3–4. Asking for a later stage exits
-with a pointer to the phase that implements it.
+`pulse run --dry-run` produces `pulse.md`: ≤250 words, 3 themes, 3 verbatim quotes with
+verified provenance, 3 action ideas, no PII.
+
+MCP publishing (stages 9–10) arrives in Phase 4. Asking for a later stage exits with a
+pointer to the phase that implements it.
 
 ## Install
 
@@ -54,12 +57,13 @@ Drop a public Play Store export into `data/raw/` (format:
 [docs/input-format.md](docs/input-format.md)), then:
 
 ```bash
-pulse run --to 4                              # ingest, normalize, scrub, classify
+pulse run --dry-run                           # the whole analysis: stages 1-8
 pulse run --to 3                              # stop before anything costs money
-pulse run --to 4 --input path/to/export.json  # explicit input
-pulse run --to 4 --week 2026-W41              # a specific target week
-pulse run --from 4 --to 4                     # replay one stage from stored artifacts
-pulse run --to 4 --no-cache                   # re-label every review
+pulse run --dry-run --input path/to/export.json
+pulse run --dry-run --week 2026-W41           # a specific target week
+pulse run --from 6 --to 8                     # redraft from stored artifacts
+pulse run --dry-run --no-cache                # re-label every review
+pulse validate                                # re-gate the latest run's note
 ```
 
 Stage 4 is the first stage that calls a model. `pulse run --to 3` never does, so ingestion
@@ -75,6 +79,10 @@ it came from:
 | `02_normalized.json` | Typed, deduplicated, window-filtered. No reviewer identity. |
 | `03_scrubbed.json` | PII removed from bodies. The first artifact safe to read freely. |
 | `04_classified.json` | One theme (or `null`) per review id. No review text. |
+| `05_stats.json` | Every theme ranked with its score, plus the three selected and their quote pools. |
+| `06_note.json` | The structured note, with quote provenance derived from the source reviews. |
+| `07_validation.json` | Every draft attempt and why it was rejected. |
+| `pulse.md` | The rendered note — the single source for both the doc and the email bodies. |
 | `run.json` | Ledger: per-stage timings, counts, token usage, outcomes. Never review text. |
 
 To try it without an export of your own, use the synthetic fixture:
@@ -87,9 +95,7 @@ pulse run --to 3 --input tests/fixtures/reviews_sample.json --week 2026-W41
 
 | Command | Arrives in |
 | --- | --- |
-| `pulse run` stages 5–8 | Phase 3 |
 | `pulse run` stages 9–10 | Phase 4 |
-| `pulse validate` | Phase 3 |
 | `pulse contract check` | Phase 4 |
 
 ## Configuration

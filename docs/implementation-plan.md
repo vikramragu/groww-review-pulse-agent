@@ -2,7 +2,7 @@
 
 > Phase-by-phase build plan for the agent described in [architecture.md](architecture.md),
 > delivering the requirements in [problemStatement.md](problemStatement.md).
-> Status: **Phases 0–2 complete; Phase 3 next.** Last updated: 2026-10-12.
+> Status: **Phases 0–3 complete; Phase 4 next (needs X1 agreed).** Last updated: 2026-10-12.
 
 ---
 
@@ -362,7 +362,7 @@ be optimising for fiction. Revisit when real reviews are available (O1).
 
 ---
 
-## 6. Phase 3 — Aggregate, draft, validate, render
+## 6. Phase 3 — Aggregate, draft, validate, render ✅ COMPLETE (2026-10-12)
 
 **Goal:** `pulse run --dry-run` produces a compliant one-page note on disk. This is the phase that
 satisfies most of the acceptance checklist.
@@ -424,12 +424,43 @@ bullets, block quotes, and links. Rendering a markdown table here would produce 
 server isn't contracted to handle.
 
 ```bash
-# ✅ Exit
-pytest -q                                      # every test green, no network
-pulse run --dry-run --input tests/fixtures/reviews_sample.json
-# → runs/<week>-01/pulse.md: ≤250 words, 3 themes, 3 verbatim quotes, 3 actions, no PII
-pulse validate runs/<week>-01                  # re-gates the stored note, passes
+# ✅ Exit — all verified 2026-10-12
+pytest -q          # 607 passed (25 aggregate, 54 validate, 15 render, 14 draft loop)
+ruff check . && ruff format --check . && mypy src
+pulse run --dry-run --input tests/fixtures/reviews_sample.json --week 2026-W41
+pulse validate     # re-gates the stored note: passes
 ```
+
+The produced note, measured rather than asserted: **238 words**, 3 themes, 3 quotes, 3
+actions, no PII, every quote verbatim with correct provenance. Accepted on the **first**
+attempt — the regeneration loop was not needed, though `test_draft_loop.py` scripts it.
+
+### What landed beyond the task list — Phase 3
+
+| Addition | Why |
+| --- | --- |
+| `QuoteCandidate` model | §7 typed `quote_candidates` as `list[str]`, which made §9's provenance check unimplementable. See the bug below. |
+| Stage 7 runnable standalone | Fused into stage 6 for the retry loop, but also registered on its own so `pulse validate` can re-gate a stored artifact. Makes a published note auditable after the fact. |
+| `05_stats.json` stores the **full** ranking | Not just the top three, so "why wasn't payments on the page?" is answerable from the artifact rather than by re-running. |
+| `generated_on` as a parameter | Rendering must be a pure function of its inputs, or the P6 golden test could never compare two renders. |
+| `readability_score()` | The candidate pool needs a deterministic order; the model picks from a pre-vetted set, so what gets into that set is a code decision. |
+| `render_email_body()`, `email_subject()` | Stage 10 needs them in Phase 4; cheap to write beside the renderer they share a template with. |
+
+### The bug this phase found
+
+**The model fabricated quote provenance.** The verbatim check protected the quote *text*
+and nothing else — so `Quote.review_id` and `Quote.rating` were fields the model filled in
+freely. In a real run it invented ids (`r001`, `r002`, `r003`) that existed nowhere in the
+corpus, and guessed star ratings: "Onboarding is clean and fast" was published as **2★**
+when the source review was **5★**, and an unanswered-ticket complaint as **4★** when it was
+**2★**.
+
+A verbatim quote under a fabricated rating is still a misleading artifact. Root cause was an
+inconsistency in the architecture itself: §9 specified a provenance check that §7's
+text-only candidate type made impossible to write. Candidates now carry provenance, stage 7
+**derives** both fields from the matched review rather than trusting them, and the number of
+corrections is recorded in the ledger — a model that invents ids is worth knowing about even
+when the correction is automatic.
 
 At this point problemStatement.md §8 is satisfied **except** the two MCP delivery lines.
 

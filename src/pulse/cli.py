@@ -34,7 +34,6 @@ from pulse.ingest.base import IngestError
 from pulse.llm import LlmError, list_groq_models, probe_schema_support
 from pulse.models import Theme
 from pulse.orchestrator import (
-    DEFAULT_RUNS_ROOT,
     STAGE_NAMES,
     RunContext,
     RunError,
@@ -431,11 +430,30 @@ def validate(
     ] = None,
 ) -> None:
     """Re-run the validation gate against a stored note."""
-    target = run_dir or DEFAULT_RUNS_ROOT
-    if run_dir is not None and not run_dir.is_dir():
-        typer.secho(f"Not a directory: {target}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1)
-    raise _not_implemented("pulse validate", "Phase 3 (P3-T12 through P3-T17)")
+    settings = _load_or_exit()
+    context = _open_run_for_replay(run_dir)
+
+    options = PipelineOptions(
+        settings=settings,
+        input_path=settings.pulse.input.path,
+        target_week=context.iso_week,
+        from_stage=7,
+        to_stage=7,
+    )
+
+    typer.secho(f"re-validating {context.run_id}", fg=typer.colors.CYAN, bold=True)
+    try:
+        run_stages(context, options)
+    except (PipelineError, RunError) as exc:
+        typer.secho(f"\nValidation failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    record = context.ledger.stages[-1]
+    typer.secho(
+        f"The stored note still passes every check ({record.detail.get('word_count')} words).",
+        fg=typer.colors.GREEN,
+        bold=True,
+    )
 
 
 @contract_app.command("check")

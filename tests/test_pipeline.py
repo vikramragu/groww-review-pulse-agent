@@ -57,14 +57,21 @@ def run_to_scrub(settings: Settings, tmp_path: Path) -> object:
 # --------------------------------------------------------------------------------------
 
 
-def test_stages_one_to_four_are_implemented() -> None:
-    assert [stage for stage in range(1, 11) if stage_is_implemented(stage)] == [1, 2, 3, 4]
+def test_stages_one_to_eight_are_implemented() -> None:
+    """Stages 9-10 are the two MCP delivery steps, which arrive in Phase 4."""
+    assert [stage for stage in range(1, 11) if stage_is_implemented(stage)] == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+    ]
 
 
-@pytest.mark.parametrize(
-    ("stage", "phase"),
-    [(5, "Phase 3"), (7, "Phase 3"), (9, "Phase 4"), (10, "Phase 4")],
-)
+@pytest.mark.parametrize(("stage", "phase"), [(9, "Phase 4"), (10, "Phase 4")])
 def test_a_later_stage_names_the_phase_that_delivers_it(
     settings: Settings, tmp_path: Path, stage: int, phase: str
 ) -> None:

@@ -13,14 +13,17 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 from pulse import logging as pulse_logging
+from pulse.analysis.aggregate import AggregateError, aggregate, select_top_themes
 from pulse.analysis.classify import (
     DEFAULT_CACHE_PATH,
     ClassificationCache,
     classify_reviews,
 )
+from pulse.analysis.draft import DraftError, draft_note
 from pulse.analysis.scrub import scrub_reviews
 from pulse.config import Settings
 from pulse.ingest.base import build_source
@@ -31,9 +34,20 @@ from pulse.ingest.normalize import (
     validate_window,
 )
 from pulse.llm import LlmPort, build_llm, usage_for_ledger
-from pulse.models import LlmUsage, RawReview, Review
+from pulse.models import (
+    ClassifiedReview,
+    LlmUsage,
+    PulseNote,
+    QuoteCandidate,
+    RawReview,
+    Review,
+    Theme,
+    ThemeStats,
+)
 from pulse.orchestrator import RunContext
 from pulse.prompts.taxonomy import taxonomy_prompt
+from pulse.rendering.render import render_note
+from pulse.rendering.validate import assert_publishable, validate_note
 
 log = pulse_logging.get_logger("pipeline")
 
@@ -42,10 +56,6 @@ LAST_STAGE = 10
 
 #: Which phase delivers each not-yet-implemented stage, for the error message.
 _PENDING_STAGES: dict[int, str] = {
-    5: "Phase 3 (aggregation)",
-    6: "Phase 3 (drafting)",
-    7: "Phase 3 (validation gate)",
-    8: "Phase 3 (rendering)",
     9: "Phase 4 (publish to Google Docs via MCP)",
     10: "Phase 4 (create the Gmail draft via MCP)",
 }
@@ -73,6 +83,9 @@ class PipelineOptions:
     llm: LlmPort | None = None
     cache_path: Path = DEFAULT_CACHE_PATH
     use_cache: bool = True
+    #: Stamped into the rendered note. A parameter rather than `date.today()` so a render
+    #: is a pure function of its inputs and the P6 golden test can compare two of them.
+    generated_on: date | None = None
 
 
 # --------------------------------------------------------------------------------------
@@ -192,6 +205,154 @@ def stage_classify(
 
 
 # --------------------------------------------------------------------------------------
+# Stage 5 — aggregate
+# --------------------------------------------------------------------------------------
+
+
+def stage_aggregate(
+    context: RunContext, options: PipelineOptions, detail: dict[str, object]
+) -> None:
+    """Rank themes and build quote candidate pools, writing `05_stats.json`.
+
+    Deterministic: this is where "top 3 themes" is decided, so it must be reproducible
+    (architecture.md §8.2).
+    """
+    reviews = context.read_models(3, Review)
+    classified = context.read_models(4, ClassifiedReview)
+
+    try:
+        ranked, report = aggregate(
+            reviews,
+            classified,
+            settings=options.settings,
+            target_week=options.target_week,
+        )
+        selected = select_top_themes(ranked, report)
+    except AggregateError as exc:
+        raise PipelineError(str(exc)) from exc
+
+    # The full ranking is stored, not just the top three: a reader asking "why wasn't
+    # payments on the page?" should be able to answer it from the artifact.
+    context.write_artifact(
+        5,
+        {
+            "selected": [s.model_dump(mode="json") for s in selected],
+            "ranked": [s.model_dump(mode="json") for s in ranked],
+            "report": report.summary(),
+        },
+    )
+    detail.update(report.summary())
+
+
+# --------------------------------------------------------------------------------------
+# Stages 6-8 — draft, validate, render
+# --------------------------------------------------------------------------------------
+
+
+def stage_draft(context: RunContext, options: PipelineOptions, detail: dict[str, object]) -> None:
+    """Draft the note, gating and regenerating until it validates (stages 6 and 7).
+
+    Stages 6 and 7 are one unit because the gate feeds back into the draft: splitting them
+    across artifact boundaries would mean persisting a note that failed validation, which
+    is exactly the thing that must never be publishable.
+    """
+    payload = context.read_artifact(5)
+    selected = [ThemeStats.model_validate(item) for item in payload["selected"]]
+    corpus_size = len(context.read_models(3, Review))
+
+    llm = (
+        options.llm
+        if options.llm is not None
+        else build_llm(options.settings, override=options.llm_override)
+    )
+
+    try:
+        outcome = draft_note(
+            selected,
+            llm=llm,
+            settings=options.settings,
+            iso_week=options.target_week,
+            corpus_size=corpus_size,
+            generated_on=options.generated_on,
+        )
+    except DraftError as exc:
+        # Every attempt's failures are persisted before the abort, so a developer can see
+        # what the model actually got wrong rather than guessing from a log line.
+        context.write_artifact(7, {"status": "aborted", "reason": str(exc)})
+        raise PipelineError(str(exc)) from exc
+
+    context.write_artifact(6, outcome.note)
+    context.write_artifact(
+        7,
+        {
+            "status": "ok",
+            "attempts": [r.summary() for r in outcome.history],
+            "report": outcome.report.summary(),
+        },
+    )
+
+    context.ledger.draft_attempts = outcome.report.attempts
+    context.ledger.usage = LlmUsage.model_validate(usage_for_ledger(llm))
+    detail.update(outcome.report.summary())
+
+
+def stage_validate(
+    context: RunContext, options: PipelineOptions, detail: dict[str, object]
+) -> None:
+    """Re-gate the stored note against the stored candidate pools.
+
+    Stage 7 also runs *inside* stage 6 during a fresh draft, because the gate feeds the
+    retry loop and a note that failed must never be persisted as though it had passed.
+    This standalone form exists for the other direction — re-checking an artifact after
+    the fact, which is what `pulse validate` does and what keeps a published note
+    auditable later.
+    """
+    note = context.read_model(6, PulseNote)
+    corpus_size = len(context.read_models(3, Review))
+    markdown = render_note(note, corpus_size=corpus_size, generated_on=options.generated_on)
+
+    result = validate_note(
+        note,
+        markdown,
+        allowed_themes=[s.theme for s in note.top_themes],
+        candidates_by_theme=_candidates_from_artifact(context),
+    )
+    detail.update(result.summary())
+
+    if not result.ok:
+        raise PipelineError(
+            "The stored note no longer passes validation: " + "; ".join(result.messages())
+        )
+
+
+def stage_render(context: RunContext, options: PipelineOptions, detail: dict[str, object]) -> None:
+    """Write `pulse.md` — the single source for both the doc and the email bodies."""
+    note = context.read_model(6, PulseNote)
+    corpus_size = len(context.read_models(3, Review))
+
+    markdown = render_note(note, corpus_size=corpus_size, generated_on=options.generated_on)
+
+    # Re-gated rather than trusted: this is the exact text that will be published, and the
+    # cost of checking twice is microseconds.
+    result = validate_note(
+        note,
+        markdown,
+        allowed_themes=[s.theme for s in note.top_themes],
+        candidates_by_theme=_candidates_from_artifact(context),
+    )
+    assert_publishable(result, markdown)
+
+    path = context.write_note(markdown)
+    detail.update({"path": str(path), "words": result.word_count})
+
+
+def _candidates_from_artifact(context: RunContext) -> dict[Theme, list[QuoteCandidate]]:
+    payload = context.read_artifact(5)
+    selected = [ThemeStats.model_validate(item) for item in payload["selected"]]
+    return {stats.theme: list(stats.quote_candidates) for stats in selected}
+
+
+# --------------------------------------------------------------------------------------
 # Dispatch
 # --------------------------------------------------------------------------------------
 
@@ -202,6 +363,10 @@ _STAGES: dict[int, StageFn] = {
     2: stage_normalize,
     3: stage_scrub,
     4: stage_classify,
+    5: stage_aggregate,
+    6: stage_draft,
+    7: stage_validate,
+    8: stage_render,
 }
 
 

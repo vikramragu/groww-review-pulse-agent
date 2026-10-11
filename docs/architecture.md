@@ -277,13 +277,20 @@ class ClassifiedReview(BaseModel):
     confidence: Annotated[float, Field(ge=0, le=1)]
 
 
+class QuoteCandidate(BaseModel):
+    """A quotable review, carrying the provenance a quote drawn from it needs."""
+    review_id: str
+    text: str
+    rating: Annotated[int, Field(ge=1, le=5)]
+
+
 class ThemeStats(BaseModel):
     theme: Theme
     review_count: int
     share_of_week: float
     mean_rating: float
     delta_vs_baseline: float            # share change vs trailing weeks
-    quote_candidates: list[str]         # verbatim, scrubbed, ranked
+    quote_candidates: list[QuoteCandidate]   # verbatim, scrubbed, ranked, with provenance
 
 
 class Quote(BaseModel):
@@ -467,7 +474,7 @@ The gate that makes the hard constraints real. Runs entirely in code, no model i
 | Cardinality | 3 themes, 3 quotes, 3 actions | Pydantic rejects at parse time |
 | Theme validity | Each theme ∈ `Theme` and ∈ the top-3 the aggregator chose | Regenerate |
 | **Verbatim** | Each `quote.text`, whitespace-normalized, is an exact substring of exactly one candidate's scrubbed text | Regenerate, naming the offending quote |
-| Provenance | `quote.review_id` matches the review the substring was found in | Regenerate |
+| Provenance | **Derived, not checked**: `review_id` and `rating` are overwritten from the matched candidate | n/a — the model's values are discarded |
 | **Word count** | Rendered body ≤ 250 words | Regenerate with the measured count |
 | **PII rescan** | Full scrub detector finds nothing in the rendered note | **Abort the run** |
 | Distinctness | The 3 quotes come from 3 distinct reviews | Regenerate |
@@ -476,6 +483,16 @@ The gate that makes the hard constraints real. Runs entirely in code, no model i
 **Regeneration loop:** at most 3 attempts. Each retry appends the specific failures as feedback —
 not a bare "try again," which tends to produce a differently-wrong note. After 3 failures the run
 aborts and writes a validation report; it does not publish a non-compliant note.
+
+**Provenance is derived rather than validated.** An earlier version of this section
+specified checking that `quote.review_id` matched its source — but §7 typed
+`quote_candidates` as `list[str]`, which made that check unimplementable, and left
+`review_id` and `rating` as fields the model filled in freely. It did: a real run produced
+invented ids (`r001`, `r002`) and guessed star ratings sitting beside correctly verified
+quote text. A verbatim quote under the wrong rating is still a misleading artifact. So
+candidates now carry provenance and stage 7 overwrites both fields from the matched
+review; the model's values are discarded unread, and the count of corrections is recorded
+in the ledger.
 
 **PII failure is an abort, not a retry.** A PII hit at this point means stage 3 has a gap. Retrying
 the drafting step would be treating a scrubber bug as a drafting problem, and might well succeed by
