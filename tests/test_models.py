@@ -20,6 +20,7 @@ from pulse.models import (
     LlmUsage,
     PulseNote,
     Quote,
+    QuoteCandidate,
     RawReview,
     Review,
     RunLedger,
@@ -249,7 +250,13 @@ def test_theme_stats_round_trips() -> None:
             "share_of_week": 0.19,
             "mean_rating": 2.1,
             "delta_vs_baseline": 0.04,
-            "quote_candidates": ["App crashes every time I open the chart."],
+            "quote_candidates": [
+                {
+                    "review_id": "c" * 16,
+                    "text": "App crashes every time I open the chart.",
+                    "rating": 1,
+                }
+            ],
         }
     )
     assert ThemeStats.model_validate(stats.model_dump(mode="json")) == stats
@@ -370,3 +377,25 @@ def test_stage_record_rejects_unknown_status() -> None:
                 "duration_ms": 1,
             }
         )
+
+
+# --------------------------------------------------------------------------------------
+# QuoteCandidate — provenance, added beyond §7
+# --------------------------------------------------------------------------------------
+
+
+def test_quote_candidate_carries_provenance() -> None:
+    """Text alone made §9's provenance check unimplementable, and left `Quote.review_id`
+    and `Quote.rating` as fields the model filled in freely — which it did, inventing ids
+    like `r001` and guessing star ratings. Stage 7 now derives both from here."""
+    candidate = QuoteCandidate.model_validate(
+        {"review_id": "a" * 16, "text": "Withdrawal is stuck.", "rating": 2}
+    )
+    assert set(QuoteCandidate.model_fields) == {"review_id", "text", "rating"}
+    assert candidate.rating == 2
+
+
+@pytest.mark.parametrize("rating", [0, 6])
+def test_quote_candidate_rejects_an_impossible_rating(rating: int) -> None:
+    with pytest.raises(ValidationError):
+        QuoteCandidate.model_validate({"review_id": "a" * 16, "text": "x", "rating": rating})

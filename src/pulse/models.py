@@ -85,13 +85,29 @@ class ClassifiedReview(BaseModel):
     confidence: Annotated[float, Field(ge=0, le=1)]
 
 
+class QuoteCandidate(BaseModel):
+    """A quotable review, with the provenance needed to verify a quote drawn from it.
+
+    Addition beyond §7, which typed `quote_candidates` as `list[str]`. Text alone makes
+    §9's provenance check *unimplementable* — and worse, it leaves `Quote.review_id` and
+    `Quote.rating` as fields the model fills in freely. Observed in practice: the model
+    invented ids (`r001`, `r002`) and guessed star ratings, publishing fabricated
+    provenance beside a correctly verified quote. Carrying the facts here lets stage 7
+    derive them instead of trusting them.
+    """
+
+    review_id: str
+    text: str
+    rating: Annotated[int, Field(ge=1, le=5)]
+
+
 class ThemeStats(BaseModel):
     theme: Theme
     review_count: int
     share_of_week: float
     mean_rating: float
     delta_vs_baseline: float  # share change vs trailing weeks
-    quote_candidates: list[str]  # verbatim, scrubbed, ranked
+    quote_candidates: list[QuoteCandidate]  # verbatim, scrubbed, ranked, with provenance
 
 
 class Quote(BaseModel):
