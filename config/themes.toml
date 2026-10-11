@@ -1,0 +1,31 @@
+# The closed theme taxonomy (architecture.md D4, §7).
+#
+# These keys MUST match the `Theme` enum in src/pulse/models.py exactly — config loading
+# fails if they drift apart. That is deliberate: the enum is what structurally guarantees
+# the "at most 5 themes" constraint, so the two cannot be allowed to disagree.
+#
+# To change the taxonomy: edit the enum AND this file together, and bump `version` below.
+# The classification cache is keyed on that version, so stale labels are never served from
+# a taxonomy that no longer exists. Do NOT add a sixth theme.
+
+version = "1"
+
+[themes.onboarding_kyc]
+label = "Onboarding & KYC"
+covers = "Signup, KYC/eKYC, document upload, verification delays, account activation"
+
+[themes.orders_execution]
+label = "Orders & Execution"
+covers = "Order placement/failure, price feeds, charts, watchlists, IPO applications, execution slippage"
+
+[themes.payments_withdrawals]
+label = "Payments & Withdrawals"
+covers = "UPI/netbanking deposits, withdrawal delays, settlement timing, failed or stuck transfers, refunds"
+
+[themes.app_reliability]
+label = "App Reliability"
+covers = "Crashes, login failures, slowness, OTP issues, upgrade breakage, downtime during market hours"
+
+[themes.charges_support]
+label = "Charges & Support"
+covers = "Brokerage/AMC/hidden charges, statements and reports, support responsiveness, account closure"

@@ -1,0 +1,41 @@
+# MCP server bindings (architecture.md §11.3).
+#
+# This repo is the MCP *client* only (D8). The servers below are built in a separate
+# project and own all Google OAuth, tokens, and REST calls. Nothing here is a credential.
+#
+# `contract` is checked against the version each server advertises in `initialize`:
+# a mismatched minor warns, a mismatched major aborts (architecture.md §11.2).
+#
+# Tool names are config-driven so a rename on the server side is not a code change here.
+# Resolution happens at startup against each server's actual `list_tools()` output.
+
+contract = "pulse-mcp/1"
+
+[docs]
+# Placeholder until X2 (how the servers project is distributed) is settled.
+command = "python"
+args = ["-m", "pulse_mcp_servers.docs"]
+
+[docs.tools]
+find = "docs.find_document"
+create = "docs.create_document"
+replace = "docs.replace_document_body"
+
+[gmail]
+command = "python"
+args = ["-m", "pulse_mcp_servers.gmail"]
+
+[gmail.tools]
+create_draft = "gmail.create_draft"
+
+# The in-repo stub used by `pulse run --mcp stub` (P4-T3). It implements the same contract
+# with in-memory state, so phases 0-4 need no servers project present.
+[stub]
+command = "python"
+args = ["-m", "tests.stubs.stub_mcp_server"]
+
+[stub.tools]
+find = "docs.find_document"
+create = "docs.create_document"
+replace = "docs.replace_document_body"
+create_draft = "gmail.create_draft"

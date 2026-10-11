@@ -1,0 +1,64 @@
+# Pipeline tuning. Values here are overridable by environment variables (see config.py)
+# and then by CLI flags. Precedence: CLI > env > this file > built-in default.
+
+[window]
+# Rolling corpus window (architecture.md D5). The note covers the latest ISO week; the
+# trailing weeks form the baseline the week-over-week delta is measured against.
+weeks = 12
+min_weeks = 8
+
+[input]
+# Where the file-drop adapter looks for public review exports (P1).
+path = "data/raw"
+
+[draft]
+# Validation-gate regeneration budget (architecture.md §9). After this many failed
+# attempts the run aborts rather than publishing a non-compliant note.
+max_attempts = 3
+
+[llm]
+# Which provider stages 4 (classification) and 6 (drafting) call (architecture.md D6/D6a).
+#   groq  — the default; needs GROQ_API_KEY
+#   fake  — scripted responses, for offline development and tests
+#   none  — refuse every model call, so a misconfiguration fails loudly
+provider = "groq"
+
+# Chosen 2026-10-11 by probing the account with `pulse models --probe`. The account offers
+# neither Kimi K2 nor Llama 4 (both named by secondary sources as the schema-capable
+# models), which is why this is verified rather than assumed.
+#
+# gpt-oss-120b is the strongest chat model available here and accepts strict json_schema
+# once the schema is reshaped for it (see llm.json_schema_for). It is a reasoning model, so
+# reasoning_effort below keeps classification from spending its budget deliberating.
+# Alternative on this account: qwen/qwen3.8-27b -- strict schema, no reasoning overhead.
+model = "openai/gpt-oss-120b"
+
+# Classification is bulk work over short texts; drafting is one quality-sensitive call.
+batch_size = 40
+classify_max_tokens = 8000
+draft_max_tokens = 4000
+
+# Reasoning models (the gpt-oss family) spend output tokens deliberating before they
+# answer. Classification is not a reasoning-heavy task, so it runs low; drafting is the
+# quality-sensitive step. Silently ignored by models that have no reasoning mode.
+classify_reasoning_effort = "low"
+draft_reasoning_effort = "medium"
+
+# Deterministic by default: the same corpus should produce the same labels, or the
+# per-stage artifacts stop being comparable between runs.
+temperature = 0.0
+
+[thresholds]
+# Below this many reviews in the target week, the note would be statistically
+# meaningless and the run aborts (architecture.md §15).
+min_week_reviews = 20
+# Classification confidence floor; below this a review is left unclassified rather
+# than forced into a theme (architecture.md §8.1).
+min_confidence = 0.5
+
+[docs]
+# Title convention for the published pulse doc. `{week}` is substituted with the ISO week.
+# Idempotency depends on this being stable (architecture.md §11.5).
+title_template = "Groww Review Pulse — {week}"
+# Optional Drive parent folder (open decision O4). Empty means the server's default.
+folder_id = ""
