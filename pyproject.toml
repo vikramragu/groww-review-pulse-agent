@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "groww-review-pulse"
+version = "0.1.0"
+description = "Turns public Play Store reviews of the Groww app into a weekly one-page pulse, published via MCP."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+
+# NOTE: no google-* package appears here or ever will. Google access is the separate
+# MCP servers project's concern (architecture.md D8); P6-T1 enforces this with a test.
+dependencies = [
+    "pydantic>=2.9",
+    "groq>=0.11",
+    "mcp>=1.2",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+# Groq is the configured provider (D6a). The Anthropic SDK is an extra rather than a core
+# dependency so the default install carries no unused client; `LlmPort` makes adding an
+# `AnthropicLlm` a contained change if the provider is switched back.
+anthropic = ["anthropic>=1.0"]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[project.scripts]
+pulse = "pulse.cli:entrypoint"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pulse"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+asyncio_mode = "auto"
+filterwarnings = ["error::DeprecationWarning:pulse.*"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py311"
+# `docs/` holds design documents. Their Python snippets are illustrative prose, not code
+# this project builds, and reformatting them churns a reviewed document for no benefit.
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+strict = true
+warn_unreachable = true
+# Third-party packages without bundled type information.
+[[tool.mypy.overrides]]
+module = ["mcp.*"]
+ignore_missing_imports = true

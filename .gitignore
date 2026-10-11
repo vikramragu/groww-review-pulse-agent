@@ -1,0 +1,34 @@
+# Review data and run artifacts — may contain PII as exported (architecture.md §18)
+data/raw/
+runs/
+.cache/
+
+# Secrets — never commit a provider key
+.env
+.env.*
+*.key
+secrets.toml
+# ...but the placeholder-only template must be tracked, or `pulse init-env` has
+# nothing to copy from. A test asserts it never contains a real key.
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
