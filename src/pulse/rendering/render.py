@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import date
 
 from pulse.models import PulseNote, Theme
+from pulse.publish.ports import Block
 
 #: Human labels for the enum. Kept here rather than read from config so rendering stays a
 #: pure function of the note: a doc whose headings depend on mutable config would not be
@@ -38,6 +39,7 @@ def render_note(
     note: PulseNote,
     *,
     corpus_size: int,
+    corpus_total: int | None = None,
     generated_on: date | None = None,
     document_url: str | None = None,
 ) -> str:
@@ -50,7 +52,7 @@ def render_note(
     lines: list[str] = [
         f"# Groww Review Pulse — {note.iso_week}",
         "",
-        _metadata_line(note, corpus_size, generated_on),
+        _metadata_line(note, corpus_size, corpus_total, generated_on),
         "",
         f"**{note.headline}**",
         "",
@@ -86,11 +88,72 @@ def render_note(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _metadata_line(note: PulseNote, corpus_size: int, generated_on: date | None) -> str:
-    parts = [f"{corpus_size} reviews in window"]
+def render_blocks(
+    note: PulseNote,
+    *,
+    corpus_size: int,
+    corpus_total: int | None = None,
+    generated_on: date | None = None,
+) -> list[Block]:
+    """The same note as typed blocks, for a Docs server that takes blocks, not markdown.
+
+    Mirrors `render_note` line for line, with the markup removed: the server supports only
+    whole-block bold, so inline emphasis and block quotes become plain paragraphs. Quote
+    text is passed through untouched -- stage 7 proved it verbatim, and this second render
+    path must not undo that (implementation-plan.md P5-T5).
+    """
+    blocks = [
+        Block("heading1", f"Groww Review Pulse — {note.iso_week}"),
+        Block("paragraph", _metadata_text(corpus_size, corpus_total, generated_on)),
+        Block("paragraph", note.headline, bold=True),
+        Block("heading2", "Top themes"),
+    ]
+    for stats in note.top_themes:
+        mark = DIRECTION_MARKS.get(stats.direction, "")
+        blocks.append(
+            Block(
+                "bullet",
+                f"{theme_label(stats.theme)} {mark} ({stats.review_count} reviews) — "
+                f"{stats.summary}",
+            )
+        )
+
+    blocks.append(Block("heading2", "What users said"))
+    for quote in note.quotes:
+        blocks.append(Block("paragraph", f"“{quote.text}”"))
+        blocks.append(Block("paragraph", f"— {quote.rating}★, {theme_label(quote.theme)}"))
+
+    blocks.append(Block("heading2", "What to do next"))
+    for action in note.actions:
+        blocks.append(
+            Block(
+                "numbered",
+                f"{action.action} ({theme_label(action.theme)}) — {action.rationale}",
+            )
+        )
+    return blocks
+
+
+def _metadata_text(corpus_size: int, corpus_total: int | None, generated_on: date | None) -> str:
+    # Both counts, deliberately. The substance filters are sample selection, so a theme
+    # share is a share of *substantive* reviews -- stating only the filtered figure invites
+    # it to be read as a population statistic.
+    if corpus_total and corpus_total > corpus_size:
+        parts = [f"{corpus_size:,} substantive reviews of {corpus_total:,} in window"]
+    else:
+        parts = [f"{corpus_size:,} reviews in window"]
     if generated_on is not None:
         parts.append(f"generated {generated_on.isoformat()}")
-    return "*" + " · ".join(parts) + "*"
+    return " · ".join(parts)
+
+
+def _metadata_line(
+    note: PulseNote,
+    corpus_size: int,
+    corpus_total: int | None,
+    generated_on: date | None,
+) -> str:
+    return "*" + _metadata_text(corpus_size, corpus_total, generated_on) + "*"
 
 
 def render_email_body(note: PulseNote, markdown: str, document_url: str | None) -> str:

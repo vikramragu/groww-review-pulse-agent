@@ -16,6 +16,21 @@ path = "data/raw"
 # attempts the run aborts rather than publishing a non-compliant note.
 max_attempts = 3
 
+[play_store]
+# What `pulse fetch` downloads. Not used by the pipeline, which only ever reads files
+# from [input] path -- see src/pulse/ingest/play_store.py for why fetching is a separate
+# command rather than a pipeline source.
+app_id = "com.nextbillion.groww"
+# `en` keeps the corpus in the language the classifier prompt is written in. It does bias
+# the sample: Groww's users review in many Indian languages, and those are excluded.
+lang = "en"
+country = "in"
+# Second ceiling on a fetch, deliberately generous: the *window* is the stop condition,
+# and a cap that binds first would hand the pipeline a corpus narrower than
+# window.min_weeks, which stage 2 then correctly refuses. Groww gets roughly 100 English
+# reviews a day, so 12 weeks is around 8,500 -- this leaves headroom above that.
+max_reviews = 15000
+
 [llm]
 # Which provider stages 4 (classification) and 6 (drafting) call (architecture.md D6/D6a).
 #   groq  — the default; needs GROQ_API_KEY
@@ -56,9 +71,25 @@ min_week_reviews = 20
 # than forced into a theme (architecture.md §8.1).
 min_confidence = 0.5
 
+# Inclusive minimum word count for a review to be classified. 9 implements the rule "more
+# than 8 words" (decided 2026-10-15). Only tokens containing a letter count, so emoji and
+# bare numbers cannot pad a review over the floor.
+#
+# Measured on the real 12-week corpus, together with the emoji, non-Latin-script and
+# romanized-Hindi rules: 1,708 of 8,812 reviews kept (19.4%), at least 86 in every week,
+# 144 in the target week -- well above the 20-review floor stage 5 requires.
+#
+# The trade, recorded rather than hidden: this discards the 4-8 word band, which contains
+# genuinely classifiable text ("withdrawal pending since last week" is 5 words). The note
+# discloses both counts: these filters are sample selection and the shares are not
+# population shares (architecture.md §10).
+min_review_words = 9
+
 [docs]
-# Title convention for the published pulse doc. `{week}` is substituted with the ISO week.
-# Idempotency depends on this being stable (architecture.md §11.5).
+# Heading of each week's section in the standing doc, and the email subject. `{week}` is
+# substituted with the ISO week.
 title_template = "Groww Review Pulse — {week}"
-# Optional Drive parent folder (open decision O4). Empty means the server's default.
-folder_id = ""
+# The standing Google Doc every week is appended to (implementation-plan.md §8.2). The MCP
+# server cannot create or find documents, so create it once by hand in the account the
+# server is authorized as. Not a secret; PULSE_DOC_ID overrides it (e.g. for a scratch doc).
+document_id = ""

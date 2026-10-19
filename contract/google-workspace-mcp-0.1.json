@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "server": "google-workspace-mcp",
+  "version": "0.1",
+  "source": "https://github.com/vikramragu/Mail-Docs-MCP-Server at commit 75adcf6",
+  "description": "Consumer-driven contract: what the Groww Review Pulse agent sends to and reads from the google-workspace-mcp server. It does not restate the server's full schemas. `pulse contract check` verifies the live server accepts every example request below and declares every response field the agent reads. Supersedes contract/archive/pulse-mcp-1.json (implementation-plan.md section 8.1, option A).",
+  "versioning": {
+    "advertised_in": "initialize result serverInfo.name and serverInfo.version (semver)",
+    "client_rule": "name must match. Major 0: a different minor aborts (0.x minors may break). Major >= 1: a different minor warns, a different major aborts. Patch is ignored."
+  },
+  "never_bind": ["send"],
+  "tools": {
+    "docs_get_info": {
+      "role": "get_info",
+      "request": {
+        "type": "object",
+        "required": ["document"],
+        "properties": {
+          "document": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      },
+      "example": { "document": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-" },
+      "response": {
+        "type": "object",
+        "required": ["document_id", "title", "url", "tabs"],
+        "properties": {
+          "document_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "url": { "type": "string", "minLength": 1 },
+          "tabs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["tab_id", "title"],
+              "properties": {
+                "tab_id": { "type": "string" },
+                "title": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "docs_append_content": {
+      "role": "append",
+      "request": {
+        "type": "object",
+        "required": ["document", "blocks"],
+        "properties": {
+          "document": { "type": "string", "minLength": 1 },
+          "blocks": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "required": ["type", "text"],
+              "properties": {
+                "type": {
+                  "enum": ["paragraph", "heading1", "heading2", "heading3", "bullet", "numbered"]
+                },
+                "text": { "type": "string", "minLength": 1, "maxLength": 10000 },
+                "bold": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "add_separator": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "example": {
+        "document": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "blocks": [
+          { "type": "heading1", "text": "Groww Review Pulse — 2026-W41", "bold": false },
+          { "type": "paragraph", "text": "Withdrawal delays dominate this week", "bold": true },
+          { "type": "bullet", "text": "Payments & Withdrawals (10 reviews)", "bold": false },
+          { "type": "numbered", "text": "Fix withdrawals.", "bold": false }
+        ],
+        "add_separator": true
+      },
+      "response": {
+        "type": "object",
+        "required": ["status", "document_id", "blocks_appended", "url"],
+        "properties": {
+          "status": { "enum": ["appended", "dry_run"] },
+          "document_id": { "type": "string", "minLength": 1 },
+          "blocks_appended": { "type": "integer", "minimum": 0 },
+          "url": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "gmail_create_draft": {
+      "role": "create_draft",
+      "request": {
+        "type": "object",
+        "required": ["to", "subject", "body"],
+        "properties": {
+          "to": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "pattern": "^[^\\s@<>()\\[\\]\\\\,;:\"]+@[^\\s@]+\\.[^\\s@]+$" }
+          },
+          "subject": { "type": "string", "minLength": 1, "maxLength": 998, "pattern": "^[^\\r\\n]+$" },
+          "body": { "type": "string", "minLength": 1, "maxLength": 200000 },
+          "body_format": { "enum": ["text", "html"] }
+        },
+        "additionalProperties": false
+      },
+      "example": {
+        "to": ["pulse@example.com"],
+        "subject": "Groww Review Pulse — 2026-W41",
+        "body": "The note, then the doc link.",
+        "body_format": "text"
+      },
+      "response": {
+        "type": "object",
+        "required": ["status", "to"],
+        "properties": {
+          "status": { "enum": ["draft_created", "dry_run"] },
+          "draft_id": { "type": "string", "minLength": 1 },
+          "to": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  },
+  "errors": {
+    "format": "isError=true with the message as the first text content block. There is no machine-readable code, so the agent classifies the message with these rules, first match wins. The messages are fixed strings in the server's src/errors.ts.",
+    "rules": [
+      { "match": "Google authorization required", "code": "AUTH_REQUIRED" },
+      { "match": "Missing permission scope", "code": "AUTH_REQUIRED" },
+      { "match": "No edit access to this document", "code": "PERMISSION_DENIED" },
+      { "match": "not on the configured allowlist", "code": "PERMISSION_DENIED" },
+      { "match": "Recipient domain not allowed", "code": "PERMISSION_DENIED" },
+      { "match": "Document not found or not shared", "code": "NOT_FOUND" },
+      { "match": "Google API temporarily unavailable", "code": "UNAVAILABLE" },
+      { "match": "Feature disabled by server configuration", "code": "FEATURE_DISABLED" },
+      { "match": "Tool \\S+ not found", "code": "FEATURE_DISABLED" },
+      {
+        "match": "Input validation error|Invalid |Too many recipients|Tab not found|Could not extract a document ID|Attachments exceed",
+        "code": "INVALID_INPUT"
+      }
+    ],
+    "fallback": "UPSTREAM_ERROR"
+  }
+}

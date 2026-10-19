@@ -18,6 +18,7 @@ from datetime import date
 from pulse.models import PulseNote, Theme
 from pulse.rendering.render import (
     email_subject,
+    render_blocks,
     render_email_body,
     render_note,
     theme_label,
@@ -182,3 +183,70 @@ def test_the_email_body_without_a_url_is_just_the_note() -> None:
 
 def test_the_subject_names_the_week() -> None:
     assert email_subject(a_note()) == "Groww Review Pulse — 2026-W41"
+
+
+# --------------------------------------------------------------------------------------
+# Blocks for the Docs server (P5-T5) -- a second render path held to the same guarantees
+# --------------------------------------------------------------------------------------
+
+
+def _markdown_lines_without_markup(markdown: str) -> list[str]:
+    """Each content line of `pulse.md` with its markdown syntax removed."""
+    lines = []
+    for raw in markdown.splitlines():
+        line = raw.strip()
+        if line in ("", ">"):
+            continue
+        for prefix in ("## ", "# ", "- ", "> "):
+            if line.startswith(prefix):
+                line = line[len(prefix) :]
+        if line[:3] in {f"{n}. " for n in range(1, 10)}:
+            line = line[3:]
+        lines.append(line.replace("**", "").strip("*"))
+    return lines
+
+
+def test_blocks_carry_every_line_of_the_markdown() -> None:
+    """The doc and the email must not drift apart: same content, different markup."""
+    note = a_note()
+    markdown = render_note(note, corpus_size=241, corpus_total=900, generated_on=date(2026, 10, 12))
+    blocks = render_blocks(note, corpus_size=241, corpus_total=900, generated_on=date(2026, 10, 12))
+    texts = [block.text for block in blocks]
+
+    for line in _markdown_lines_without_markup(markdown):
+        assert any(line in text for text in texts), line
+
+
+def test_quotes_survive_block_rendering_verbatim() -> None:
+    note = a_note()
+    texts = [b.text for b in render_blocks(note, corpus_size=241)]
+    for quote in note.quotes:
+        assert f"“{quote.text}”" in texts
+
+
+def test_blocks_contain_no_markdown_syntax() -> None:
+    for block in render_blocks(a_note(), corpus_size=241):
+        assert "**" not in block.text
+        assert not block.text.startswith(("#", "> ", "- "))
+
+
+def test_blocks_use_only_the_servers_types_and_stay_within_its_limits() -> None:
+    blocks = render_blocks(a_note(), corpus_size=241)
+    assert {b.type for b in blocks} <= {"paragraph", "heading1", "heading2", "bullet", "numbered"}
+    assert 0 < len(blocks) <= 200
+    assert all(0 < len(b.text) <= 10_000 for b in blocks)
+
+
+def test_the_section_opens_with_the_week_heading_and_bold_headline() -> None:
+    blocks = render_blocks(a_note(), corpus_size=241)
+    assert (blocks[0].type, blocks[0].text) == ("heading1", "Groww Review Pulse — 2026-W41")
+    assert any(b.bold and b.text == "Withdrawal delays dominate this week" for b in blocks)
+
+
+def test_blocks_disclose_the_substantive_subset() -> None:
+    blocks = render_blocks(a_note(), corpus_size=241, corpus_total=900)
+    assert any("241 substantive reviews of 900 in window" in b.text for b in blocks)
+
+
+def test_block_rendering_is_deterministic() -> None:
+    assert render_blocks(a_note(), corpus_size=241) == render_blocks(a_note(), corpus_size=241)

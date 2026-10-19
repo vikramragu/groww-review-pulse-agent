@@ -20,9 +20,7 @@ from pulse.orchestrator import RunContext, start_run
 from pulse.pipeline import (
     PipelineError,
     PipelineOptions,
-    StageNotImplemented,
     run_stages,
-    stage_is_implemented,
 )
 
 FIXTURE = Path("tests/fixtures/reviews_sample.json")
@@ -57,27 +55,13 @@ def run_to_scrub(settings: Settings, tmp_path: Path) -> object:
 # --------------------------------------------------------------------------------------
 
 
-def test_stages_one_to_eight_are_implemented() -> None:
-    """Stages 9-10 are the two MCP delivery steps, which arrive in Phase 4."""
-    assert [stage for stage in range(1, 11) if stage_is_implemented(stage)] == [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-    ]
-
-
-@pytest.mark.parametrize(("stage", "phase"), [(9, "Phase 4"), (10, "Phase 4")])
-def test_a_later_stage_names_the_phase_that_delivers_it(
-    settings: Settings, tmp_path: Path, stage: int, phase: str
+@pytest.mark.parametrize("stage", [9, 10])
+def test_the_mcp_stages_refuse_to_run_without_an_mcp_mode(
+    settings: Settings, tmp_path: Path, stage: int
 ) -> None:
-    """Dispatch is checked before any artifact is read, so this needs no earlier stages."""
+    """Checked before any artifact is read, so this needs no earlier stages."""
     context = start_run(FIXTURE_WEEK, tmp_path)
-    with pytest.raises(StageNotImplemented, match=phase):
+    with pytest.raises(PipelineError, match="--mcp stub"):
         run_stages(context, options(settings, tmp_path, from_stage=stage, to_stage=stage))
 
 
@@ -317,8 +301,18 @@ def test_a_too_narrow_corpus_aborts_the_run(settings: Settings, tmp_path: Path) 
     narrow.write_text(
         json.dumps(
             [
-                {"rating": 2, "text": "Only one week of reviews here.", "date": "2026-10-07"},
-                {"rating": 3, "text": "Also from the same week only.", "date": "2026-10-08"},
+                {
+                    "rating": 2,
+                    "text": "Only one week of reviews here and this one is long "
+                    "enough to survive the substance filter.",
+                    "date": "2026-10-07",
+                },
+                {
+                    "rating": 3,
+                    "text": "Also from the same week only, again written at enough "
+                    "length to pass the word floor.",
+                    "date": "2026-10-08",
+                },
             ]
         ),
         encoding="utf-8",

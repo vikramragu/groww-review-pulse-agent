@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "pulse-mcp",
+  "version": "1.0",
+  "description": "The tool contract between the Groww Review Pulse agent (MCP client) and the Docs/Gmail MCP servers. Normative source: docs/architecture.md section 11.2. Mirrored into the servers project; both test suites assert their schemas match this file.",
+  "versioning": {
+    "advertised_in": "initialize result serverInfo.version",
+    "format": "pulse-mcp/<major>.<minor>",
+    "client_rule": "same major and minor: ok; same major, different minor: warn and continue; different major or unparseable: abort before any LLM spend"
+  },
+  "servers": {
+    "docs": ["docs.find_document", "docs.create_document", "docs.replace_document_body"],
+    "gmail": ["gmail.create_draft"]
+  },
+  "error": {
+    "description": "A failed tool call returns an MCP tool result with isError=true. structuredContent carries this object; content carries the same object as JSON text for clients that read only text.",
+    "schema": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "AUTH_REQUIRED",
+            "NOT_FOUND",
+            "REVISION_MISMATCH",
+            "RATE_LIMITED",
+            "INVALID_INPUT",
+            "UPSTREAM_ERROR"
+          ]
+        },
+        "message": { "type": "string" },
+        "retry_after_seconds": { "type": ["number", "null"], "minimum": 0 }
+      }
+    }
+  },
+  "tools": {
+    "docs.find_document": {
+      "description": "Locate an existing pulse document by exact title. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["found"],
+        "oneOf": [
+          {
+            "required": ["found", "document_id", "url", "revision"],
+            "properties": {
+              "found": { "const": true },
+              "document_id": { "type": "string", "minLength": 1 },
+              "url": { "type": "string", "minLength": 1 },
+              "revision": { "type": ["string", "null"] }
+            }
+          },
+          {
+            "properties": {
+              "found": { "const": false }
+            }
+          }
+        ]
+      }
+    },
+    "docs.create_document": {
+      "description": "Create a document from CommonMark (headings, bold/italic, bullets, block quotes, links).",
+      "inputSchema": {
+        "type": "object",
+        "required": ["title", "markdown"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "markdown": { "type": "string", "minLength": 1 },
+          "folder_id": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["document_id", "url", "revision"],
+        "properties": {
+          "document_id": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "minLength": 1 },
+          "revision": { "type": "string" }
+        }
+      }
+    },
+    "docs.replace_document_body": {
+      "description": "Replace the full body of an existing document. Rejects with REVISION_MISMATCH when if_revision is given and stale.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["document_id", "markdown"],
+        "properties": {
+          "document_id": { "type": "string", "minLength": 1 },
+          "markdown": { "type": "string", "minLength": 1 },
+          "if_revision": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["document_id", "url", "revision"],
+        "properties": {
+          "document_id": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "minLength": 1 },
+          "revision": { "type": "string" }
+        }
+      }
+    },
+    "gmail.create_draft": {
+      "description": "Create a Gmail draft. Never sends; this contract deliberately has no send tool.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["to", "subject", "body_text"],
+        "properties": {
+          "to": { "type": "string", "minLength": 1 },
+          "subject": { "type": "string", "minLength": 1 },
+          "body_text": { "type": "string", "minLength": 1 },
+          "body_html": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["draft_id"],
+        "properties": {
+          "draft_id": { "type": "string", "minLength": 1 },
+          "thread_id": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

@@ -303,17 +303,20 @@ def test_recipient_presence_passes(monkeypatch: pytest.MonkeyPatch) -> None:
 # --------------------------------------------------------------------------------------
 
 
-def test_mcp_server_probes_report_skip_not_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Until P4-T15 nothing has contacted a server, so nothing may claim it is healthy."""
+def test_mcp_probes_contact_the_servers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The stub really answers. The live server, with no token configured yet, is a gap to
+    fill (WARN) rather than a fault -- like PULSE_RECIPIENT."""
     monkeypatch.setenv("PULSE_CONFIG_DIR", "config")
     _, settings = check_config()
 
     results = {result.name: result for result in check_mcp_servers(settings)}
 
-    assert results["mcp-docs"].status is CheckStatus.SKIP
-    assert results["mcp-gmail"].status is CheckStatus.SKIP
-    assert results["mcp-contract"].status is CheckStatus.OK
-    assert "pulse-mcp/1" in results["mcp-contract"].detail
+    assert results["mcp-stub"].status is CheckStatus.OK
+    assert "google-workspace-mcp 0.1" in results["mcp-stub"].detail
+    assert results["mcp-live"].status is CheckStatus.WARN
+    assert "PULSE_MCP_TOKEN" in (results["mcp-live"].hint or "")
+    assert results["mcp-doc"].status is CheckStatus.WARN
+    assert "PULSE_DOC_ID" in (results["mcp-doc"].hint or "")
 
 
 # --------------------------------------------------------------------------------------

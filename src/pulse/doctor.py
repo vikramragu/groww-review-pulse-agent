@@ -3,10 +3,10 @@
 Kept separate from `cli.py` so the checks are unit-testable without invoking Typer, and so
 presentation never gets entangled with detection.
 
-Design rule: **every check is read-only and offline.** `doctor` is the command people run
-when something is already wrong, so it must not create files, spawn servers, or spend
-money to tell them what it found. The MCP probes in Phase 4 will spawn server processes
-and call `list_tools()`; until then they report SKIP rather than pretending to pass.
+Design rule: **every check is read-only and spends nothing.** `doctor` is the command
+people run when something is already wrong, so it must not create files or spend money to
+tell them what it found. The MCP probes do spawn the configured servers, but call only
+`list_tools()` and the read-only `find_document`.
 """
 
 from __future__ import annotations
@@ -15,12 +15,18 @@ import os
 import sys
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import partial
 from pathlib import Path
+
+import anyio
 
 from pulse.config import ConfigError, LlmProvider, Settings, config_dir, load_settings
 from pulse.llm import GROQ_API_KEY_ENV
+from pulse.mcp.adapters import ALL_ROLES, McpMode, ProbeResult, probe
+from pulse.mcp.contract import ErrorCode
+from pulse.mcp.errors import McpCredentialError, McpTokenMissing, McpToolError, McpUnavailable
 from pulse.models import Theme
-from pulse.orchestrator import DEFAULT_RUNS_ROOT, current_iso_week
+from pulse.orchestrator import DEFAULT_RUNS_ROOT, last_complete_iso_week
 
 MIN_PYTHON = (3, 11)
 
@@ -270,31 +276,83 @@ def check_recipient(settings: Settings | None) -> CheckResult:
     )
 
 
-def check_mcp_servers(settings: Settings | None) -> list[CheckResult]:
-    """Placeholder probes until Phase 4 (P4-T15).
+_TOOL_ERROR_HINTS: dict[ErrorCode, tuple[str, str]] = {
+    ErrorCode.AUTH_REQUIRED: (
+        "server is reachable but not authorized with Google",
+        "Re-run `npm run auth` for the server and update GOOGLE_TOKEN_JSON_B64; this agent "
+        "never handles Google credentials.",
+    ),
+    ErrorCode.NOT_FOUND: (
+        "the configured Google Doc was not found or is not shared with the server's account",
+        "Check PULSE_DOC_ID against the doc's URL: docs.google.com/document/d/<ID>/edit.",
+    ),
+    ErrorCode.PERMISSION_DENIED: (
+        "the server refused access to the configured doc",
+        "Give the server's account edit access, or add the doc to ALLOWED_DOCUMENT_IDS.",
+    ),
+    ErrorCode.FEATURE_DISABLED: (
+        "a tool this agent needs is disabled on the server",
+        "Set ENABLE_DOCS_APPEND and ENABLE_GMAIL_DRAFTS to true on the server.",
+    ),
+}
 
-    Reporting SKIP rather than OK is deliberate: `doctor` claiming the MCP servers are
-    fine when nothing has contacted them would be exactly the kind of false assurance
-    this command exists to prevent.
-    """
+
+def _probe_result(name: str, result: ProbeResult, *, live: bool) -> CheckResult:
+    if result.ok:
+        # The stub exposes a send tool on purpose, so tests can prove it is never called;
+        # warning about it there would be noise. On the live server it is worth a WARN.
+        if result.warnings and live:
+            return CheckResult(name, CheckStatus.WARN, result.detail, result.warnings[0])
+        return CheckResult(name, CheckStatus.OK, result.detail)
+
+    error = result.error
+    if isinstance(error, McpToolError) and error.code in _TOOL_ERROR_HINTS:
+        detail, hint = _TOOL_ERROR_HINTS[error.code]
+        return CheckResult(name, CheckStatus.FAIL, detail, hint)
+    if isinstance(error, McpTokenMissing):
+        # Not yet configured, like PULSE_RECIPIENT: a gap to fill, not a fault.
+        return CheckResult(
+            name, CheckStatus.WARN, "no MCP token configured", result.detail.splitlines()[0]
+        )
+    if isinstance(error, McpCredentialError):
+        return CheckResult(name, CheckStatus.FAIL, result.detail.splitlines()[0])
+    if isinstance(error, McpUnavailable) and live:
+        # The deployed server being down is a state to report, not a fault in this
+        # environment -- the analysis half still works.
+        return CheckResult(
+            name,
+            CheckStatus.WARN,
+            result.detail.splitlines()[0],
+            "`pulse run --mcp stub` and `--dry-run` work without it.",
+        )
+    return CheckResult(name, CheckStatus.FAIL, result.detail.splitlines()[0])
+
+
+def check_mcp_servers(settings: Settings | None) -> list[CheckResult]:
+    """Connect to each server, check identity and version, bind every tool the agent uses,
+    and -- when a doc is configured -- prove it is reachable with the read-only get-info."""
     if settings is None:
         return [CheckResult("mcp", CheckStatus.SKIP, "config did not load")]
 
-    results = [
-        CheckResult(
-            "mcp-contract",
-            CheckStatus.OK,
-            f"configured for {settings.mcp.contract}",
-        )
-    ]
-    for label, server in (("mcp-docs", settings.mcp.docs), ("mcp-gmail", settings.mcp.gmail)):
-        command = " ".join([server.command, *server.args])
+    document_id = settings.pulse.docs.document_id.strip() or None
+    targets: list[tuple[str, McpMode]] = [("mcp-live", "live")]
+    if settings.mcp.stub is not None:
+        targets.append(("mcp-stub", "stub"))
+
+    results: list[CheckResult] = []
+    for name, mode in targets:
+        # The stub only knows its own document, so it is probed without one.
+        doc = document_id if mode == "live" else None
+        result = anyio.run(partial(probe, settings, mode, ALL_ROLES, document_id=doc))
+        results.append(_probe_result(name, result, live=mode == "live"))
+
+    if document_id is None:
         results.append(
             CheckResult(
-                label,
-                CheckStatus.SKIP,
-                f"not probed — configured as `{command}`",
-                "Live probing arrives in Phase 4 (P4-T15).",
+                "mcp-doc",
+                CheckStatus.WARN,
+                "no Google Doc configured",
+                "Required for stage 9: set PULSE_DOC_ID (implementation-plan.md D-4).",
             )
         )
     return results
@@ -313,7 +371,11 @@ def run_checks(input_override: Path | None = None) -> list[CheckResult]:
     results.append(check_recipient(settings))
     results.extend(check_mcp_servers(settings))
     results.append(
-        CheckResult("target-week", CheckStatus.OK, f"{current_iso_week()} (current ISO week)")
+        CheckResult(
+            "target-week",
+            CheckStatus.OK,
+            f"{last_complete_iso_week()} (last complete ISO week)",
+        )
     )
     return results
 

@@ -1,41 +1,41 @@
-# MCP server bindings (architecture.md §11.3).
+# MCP server bindings (architecture.md §11; implementation-plan.md §8).
 #
-# This repo is the MCP *client* only (D8). The servers below are built in a separate
-# project and own all Google OAuth, tokens, and REST calls. Nothing here is a credential.
+# This repo is the MCP *client* only (D8). The server is the separate google-workspace-mcp
+# project, which owns all Google OAuth, tokens, and REST calls. Nothing here is a secret:
+# `token_env` names the environment variable holding the bearer token.
 #
-# `contract` is checked against the version each server advertises in `initialize`:
-# a mismatched minor warns, a mismatched major aborts (architecture.md §11.2).
+# What the agent expects of the server -- name, version, the tools it uses, and how its
+# error messages map to error codes -- lives in `contract_file`, checked at startup.
 #
-# Tool names are config-driven so a rename on the server side is not a code change here.
-# Resolution happens at startup against each server's actual `list_tools()` output.
+# `tools` maps a port role to the tool name the server advertises, so a rename on the
+# server side is a config change here. Roles: get_info, append (Docs), create_draft (Gmail).
+# The agent refuses to bind any tool whose name contains "send" (contract `never_bind`).
 
-contract = "pulse-mcp/1"
+contract_file = "contract/google-workspace-mcp-0.1.json"
 
-[docs]
-# Placeholder until X2 (how the servers project is distributed) is settled.
-command = "python"
-args = ["-m", "pulse_mcp_servers.docs"]
+# The deployed server: one server for both Docs and Gmail, stateless Streamable HTTP.
+[live]
+transport = "http"
+url = "https://mail-docs-mcp-server-production.up.railway.app/mcp"
+token_env = "PULSE_MCP_TOKEN"
 
-[docs.tools]
-find = "docs.find_document"
-create = "docs.create_document"
-replace = "docs.replace_document_body"
+[live.tools]
+get_info = "docs_get_info"
+append = "docs_append_content"
+create_draft = "gmail_create_draft"
 
-[gmail]
-command = "python"
-args = ["-m", "pulse_mcp_servers.gmail"]
-
-[gmail.tools]
-create_draft = "gmail.create_draft"
-
-# The in-repo stub used by `pulse run --mcp stub` (P4-T3). It implements the same contract
-# with in-memory state, so phases 0-4 need no servers project present.
+# The in-repo stub used by `pulse run --mcp stub` and the test suite. It mirrors the real
+# server's tools, schemas and prose error messages. `python` means the interpreter running
+# pulse, not whatever is first on PATH.
 [stub]
+transport = "stdio"
 command = "python"
 args = ["-m", "tests.stubs.stub_mcp_server"]
+# Each stage spawns its own stub process, so state is persisted here; delete the file to
+# start from an empty Drive. The stub knows one document, `stub-doc`, out of the box.
+env = { PULSE_STUB_STATE = ".cache/stub-mcp-state.json" }
 
 [stub.tools]
-find = "docs.find_document"
-create = "docs.create_document"
-replace = "docs.replace_document_body"
-create_draft = "gmail.create_draft"
+get_info = "docs_get_info"
+append = "docs_append_content"
+create_draft = "gmail_create_draft"

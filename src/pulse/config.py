@@ -20,7 +20,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from pulse.models import Theme
 
@@ -107,6 +107,19 @@ class DraftConfig(BaseModel):
     max_attempts: Annotated[int, Field(ge=1, le=10)] = 3
 
 
+class PlayStoreConfig(BaseModel):
+    """What `pulse fetch` downloads. Deliberately separate from `[input]`, which is what
+    the pipeline reads: fetching and reading are different operations with different
+    risk profiles (see ingest/play_store.py)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    app_id: str = "com.nextbillion.groww"
+    lang: str = "en"
+    country: str = "in"
+    max_reviews: Annotated[int, Field(ge=1)] = 4000
+
+
 class LlmProvider(StrEnum):
     GROQ = "groq"
     FAKE = "fake"
@@ -139,13 +152,17 @@ class ThresholdConfig(BaseModel):
 
     min_week_reviews: Annotated[int, Field(ge=0)] = 20
     min_confidence: Annotated[float, Field(ge=0, le=1)] = 0.5
+    min_review_words: Annotated[int, Field(ge=1, le=50)] = 9
 
 
 class DocsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    #: Heading of each week's section in the standing doc. Also the email subject.
     title_template: str = "Groww Review Pulse — {week}"
-    folder_id: str = ""
+    #: The standing Google Doc every week is appended to. The server cannot create or find
+    #: documents, so it is created once by hand and its ID set here or via PULSE_DOC_ID.
+    document_id: str = ""
 
     def title_for(self, iso_week: str) -> str:
         return self.title_template.format(week=iso_week)
@@ -156,6 +173,7 @@ class PulseConfig(BaseModel):
 
     window: WindowConfig = Field(default_factory=WindowConfig)
     input: InputConfig = Field(default_factory=InputConfig)
+    play_store: PlayStoreConfig = Field(default_factory=PlayStoreConfig)
     draft: DraftConfig = Field(default_factory=DraftConfig)
     llm: LlmConfig = Field(default_factory=LlmConfig)
     thresholds: ThresholdConfig = Field(default_factory=ThresholdConfig)
@@ -180,20 +198,38 @@ class ThemesConfig(BaseModel):
 
 
 class McpServerConfig(BaseModel):
+    """How to reach one MCP server. Never holds a secret: `token_env` names the variable."""
+
     model_config = ConfigDict(extra="forbid")
 
-    command: str
+    transport: Literal["stdio", "http"] = "stdio"
+    #: stdio: the command that starts the server.
+    command: str = ""
     args: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
+    #: http: the MCP endpoint, and the env var holding its bearer token.
+    url: str = ""
+    token_env: str = ""
+    #: port role -> the tool name this server advertises
     tools: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _transport_has_its_settings(self) -> McpServerConfig:
+        if self.transport == "stdio" and not self.command:
+            raise ValueError("a stdio server needs `command`")
+        if self.transport == "http" and not self.url.startswith(("https://", "http://")):
+            raise ValueError("an http server needs `url` (https://…/mcp)")
+        return self
+
+    def describe(self) -> str:
+        return self.url if self.transport == "http" else " ".join([self.command, *self.args])
 
 
 class McpConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    contract: str
-    docs: McpServerConfig
-    gmail: McpServerConfig
+    contract_file: Path = Path("contract/google-workspace-mcp-0.1.json")
+    live: McpServerConfig
     stub: McpServerConfig | None = None
 
 
@@ -267,6 +303,8 @@ def _apply_env(pulse: PulseConfig) -> PulseConfig:
         updates["draft"] = pulse.draft.model_copy(update={"max_attempts": attempts})
     if raw_input := os.environ.get("PULSE_INPUT"):
         updates["input"] = pulse.input.model_copy(update={"path": Path(raw_input)})
+    if raw_doc := os.environ.get("PULSE_DOC_ID"):
+        updates["docs"] = pulse.docs.model_copy(update={"document_id": raw_doc.strip()})
 
     llm_updates: dict[str, Any] = {}
     if raw_provider := os.environ.get("PULSE_LLM_PROVIDER"):
@@ -379,3 +417,28 @@ def require_recipient(settings: Settings) -> str:
             "that should receive the weekly pulse draft (open decision O3)."
         )
     return settings.recipient
+
+
+def require_document_id(settings: Settings) -> str:
+    """The standing doc stage 9 appends to (stage 9 only)."""
+    document_id = settings.pulse.docs.document_id.strip()
+    if not document_id:
+        raise ConfigError(
+            "No Google Doc configured. Create the doc once in the account the MCP server is "
+            "authorized as, then set PULSE_DOC_ID (or [docs] document_id in config/pulse.toml) "
+            "to the ID from its URL: docs.google.com/document/d/<ID>/edit."
+        )
+    return document_id
+
+
+def resolve_token(server: McpServerConfig) -> str | None:
+    """The bearer token for an http server, read from the env var it names. Never logged."""
+    if not server.token_env:
+        return None
+    token = os.environ.get(server.token_env, "").strip()
+    if not token:
+        raise ConfigError(
+            f"{server.token_env} is not set. Put the MCP server's bearer token in .env as "
+            f"{server.token_env}=... -- never in config files or chat."
+        )
+    return token

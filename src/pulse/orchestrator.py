@@ -15,7 +15,7 @@ import re
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -30,8 +30,8 @@ DEFAULT_RUNS_ROOT = Path("runs")
 LEDGER_FILENAME = "run.json"
 NOTE_FILENAME = "pulse.md"
 
-#: Stage number -> artifact filename. Stages 8-10 produce `pulse.md` and ledger fields
-#: rather than numbered JSON, matching the layout in architecture.md §13.
+#: Stage number -> artifact filename. Stage 8 produces `pulse.md` instead. Stages 9-10 also
+#: set ledger fields; their artifacts record what was published, so `--from 10` can find it.
 STAGE_ARTIFACTS: dict[int, str] = {
     1: "01_raw.json",
     2: "02_normalized.json",
@@ -40,6 +40,8 @@ STAGE_ARTIFACTS: dict[int, str] = {
     5: "05_stats.json",
     6: "06_note.json",
     7: "07_validation.json",
+    9: "09_published.json",
+    10: "10_draft.json",
 }
 
 STAGE_NAMES: dict[int, str] = {
@@ -76,7 +78,21 @@ def iso_week_of(day: date) -> str:
 
 
 def current_iso_week() -> str:
+    """The ISO week containing today. Usually *not* what a run should target."""
     return iso_week_of(datetime.now(UTC).date())
+
+
+def last_complete_iso_week(today: date | None = None) -> str:
+    """The most recent ISO week that has actually finished.
+
+    The default target for a run, and deliberately not `current_iso_week()`. A weekly job
+    firing on a Monday would otherwise aim at a week holding a few hours of reviews, which
+    stage 5 then correctly refuses as a thin week -- so the obvious default would make the
+    scheduled case fail every time. It also removes a timezone dependency: which week
+    "today" falls in changes with the hour, while the last finished week does not.
+    """
+    reference = today or datetime.now(UTC).date()
+    return iso_week_of(reference - timedelta(days=7))
 
 
 class RunContext:
@@ -174,8 +190,10 @@ class RunContext:
         status: str,
         started_at: datetime,
         duration_ms: int,
-        **detail: Any,
+        detail: dict[str, Any],
     ) -> None:
+        # `detail` is a dict, not **kwargs: a stage's own detail may legitimately contain
+        # keys like "status", which as keyword arguments would collide with the parameters.
         self.ledger.stages.append(
             StageRecord.model_validate(
                 {
@@ -208,7 +226,7 @@ class RunContext:
         except Exception as exc:
             elapsed = int((time.perf_counter() - began) * 1000)
             extra_detail["error"] = f"{type(exc).__name__}: {exc}"
-            self.record_stage(stage, "failed", started_at, elapsed, **extra_detail)
+            self.record_stage(stage, "failed", started_at, elapsed, extra_detail)
             log.error(
                 "stage failed",
                 extra={"stage": stage, "stage_name": name, "duration_ms": elapsed},
@@ -216,7 +234,7 @@ class RunContext:
             raise
         else:
             elapsed = int((time.perf_counter() - began) * 1000)
-            self.record_stage(stage, "ok", started_at, elapsed, **extra_detail)
+            self.record_stage(stage, "ok", started_at, elapsed, extra_detail)
             log.info(
                 "stage ok",
                 extra={"stage": stage, "stage_name": name, "duration_ms": elapsed},

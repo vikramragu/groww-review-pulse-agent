@@ -1,9 +1,5 @@
 """Stage dispatch: runs a contiguous range of pipeline stages (P1-T9).
 
-Stages 1-3 are implemented. Stages 4-10 are registered but raise `StageNotImplemented`
-naming the phase that delivers them, so `--to 3` succeeds today and the range checking,
-artifact handling, and ledger bookkeeping are already exercised.
-
 Keeping dispatch here rather than in `orchestrator.py` preserves the layering rule from
 architecture.md §5: `orchestrator` owns run directories and the ledger and imports nothing
 from `ingest/` or `analysis/`; this module is where the stages are composed.
@@ -11,10 +7,15 @@ from `ingest/` or `analysis/`; this module is where the stages are composed.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
+from functools import partial
 from pathlib import Path
+from typing import Literal
+
+import anyio
 
 from pulse import logging as pulse_logging
 from pulse.analysis.aggregate import AggregateError, aggregate, select_top_themes
@@ -24,16 +25,20 @@ from pulse.analysis.classify import (
     classify_reviews,
 )
 from pulse.analysis.draft import DraftError, draft_note
-from pulse.analysis.scrub import scrub_reviews
-from pulse.config import Settings
+from pulse.analysis.scrub import assert_clean, scrub_reviews
+from pulse.config import ConfigError, Settings, require_document_id, require_recipient
 from pulse.ingest.base import build_source
 from pulse.ingest.normalize import (
     NormalizeError,
+    filter_substantive,
     filter_to_window,
     normalize,
     validate_window,
 )
 from pulse.llm import LlmPort, build_llm, usage_for_ledger
+from pulse.mcp.adapters import ROLES, McpMode, connect_docs, connect_gmail, probe
+from pulse.mcp.contract import ErrorCode
+from pulse.mcp.errors import McpClientError, McpToolError
 from pulse.models import (
     ClassifiedReview,
     LlmUsage,
@@ -46,23 +51,18 @@ from pulse.models import (
 )
 from pulse.orchestrator import RunContext
 from pulse.prompts.taxonomy import taxonomy_prompt
-from pulse.rendering.render import render_note
+from pulse.publish.docs import PublishedSection, previous_publication, publish_section
+from pulse.publish.gmail import create_pulse_draft
+from pulse.publish.ports import Block, DraftRef
+from pulse.rendering.render import email_subject, render_blocks, render_email_body, render_note
 from pulse.rendering.validate import assert_publishable, validate_note
 
 log = pulse_logging.get_logger("pipeline")
 
 FIRST_STAGE = 1
 LAST_STAGE = 10
-
-#: Which phase delivers each not-yet-implemented stage, for the error message.
-_PENDING_STAGES: dict[int, str] = {
-    9: "Phase 4 (publish to Google Docs via MCP)",
-    10: "Phase 4 (create the Gmail draft via MCP)",
-}
-
-
-class StageNotImplemented(Exception):
-    """Raised when a requested stage has not been built yet."""
+DOC_STAGE = 9
+EMAIL_STAGE = 10
 
 
 class PipelineError(Exception):
@@ -86,6 +86,10 @@ class PipelineOptions:
     #: Stamped into the rendered note. A parameter rather than `date.today()` so a render
     #: is a pure function of its inputs and the P6 golden test can compare two of them.
     generated_on: date | None = None
+    #: Which MCP servers stages 9-10 publish through. "none" makes them unreachable.
+    mcp_mode: Literal["none", "stub", "live"] = "none"
+    #: Append the week's section even if a previous run already published it.
+    republish: bool = False
 
 
 # --------------------------------------------------------------------------------------
@@ -122,13 +126,20 @@ def stage_normalize(
         reviews, options.target_week, options.settings.pulse.window.weeks
     )
 
+    # Substance filtering runs after windowing so both counts are available: what the
+    # window received, and how much of it says anything. The note discloses both.
+    substantive, substance = filter_substantive(
+        windowed, min_words=options.settings.pulse.thresholds.min_review_words
+    )
+
     try:
-        present = validate_window(windowed, window, options.settings.pulse.window.min_weeks)
+        present = validate_window(substantive, window, options.settings.pulse.window.min_weeks)
     except NormalizeError as exc:
         raise PipelineError(str(exc)) from exc
 
-    context.write_artifact(2, windowed)
-    context.ledger.corpus_size = len(windowed)
+    context.write_artifact(2, substantive)
+    context.ledger.corpus_size = len(substantive)
+    context.ledger.corpus_total = len(windowed)
     context.ledger.window_weeks = len(window)
     detail.update(
         {
@@ -136,6 +147,7 @@ def stage_normalize(
             "window": f"{window[0]}..{window[-1]}",
             "weeks_in_corpus": len(present),
             "reviews_in_window": len(windowed),
+            "substance": substance.summary(),
         }
     )
 
@@ -259,6 +271,7 @@ def stage_draft(context: RunContext, options: PipelineOptions, detail: dict[str,
     payload = context.read_artifact(5)
     selected = [ThemeStats.model_validate(item) for item in payload["selected"]]
     corpus_size = len(context.read_models(3, Review))
+    corpus_total = context.ledger.corpus_total
 
     llm = (
         options.llm
@@ -273,6 +286,7 @@ def stage_draft(context: RunContext, options: PipelineOptions, detail: dict[str,
             settings=options.settings,
             iso_week=options.target_week,
             corpus_size=corpus_size,
+            corpus_total=corpus_total,
             generated_on=options.generated_on,
         )
     except DraftError as exc:
@@ -309,7 +323,12 @@ def stage_validate(
     """
     note = context.read_model(6, PulseNote)
     corpus_size = len(context.read_models(3, Review))
-    markdown = render_note(note, corpus_size=corpus_size, generated_on=options.generated_on)
+    markdown = render_note(
+        note,
+        corpus_size=corpus_size,
+        corpus_total=context.ledger.corpus_total,
+        generated_on=options.generated_on,
+    )
 
     result = validate_note(
         note,
@@ -330,7 +349,14 @@ def stage_render(context: RunContext, options: PipelineOptions, detail: dict[str
     note = context.read_model(6, PulseNote)
     corpus_size = len(context.read_models(3, Review))
 
-    markdown = render_note(note, corpus_size=corpus_size, generated_on=options.generated_on)
+    # corpus_total is passed so the note discloses the substantive subset against the whole
+    # window (§5.1). Omitting it silently dropped that disclosure from every pulse.md.
+    markdown = render_note(
+        note,
+        corpus_size=corpus_size,
+        corpus_total=context.ledger.corpus_total,
+        generated_on=options.generated_on,
+    )
 
     # Re-gated rather than trusted: this is the exact text that will be published, and the
     # cost of checking twice is microseconds.
@@ -353,6 +379,227 @@ def _candidates_from_artifact(context: RunContext) -> dict[Theme, list[QuoteCand
 
 
 # --------------------------------------------------------------------------------------
+# Stages 9-10 — publish through MCP
+# --------------------------------------------------------------------------------------
+
+
+def _require_mcp(options: PipelineOptions) -> McpMode:
+    if options.mcp_mode == "none":
+        raise PipelineError(
+            "Stages 9-10 publish through MCP; choose `--mcp stub` or `--mcp live`, "
+            "or stop at stage 8 with `--dry-run`."
+        )
+    return options.mcp_mode
+
+
+def _publishable_markdown(context: RunContext) -> str:
+    """`pulse.md`, re-scanned for PII: it is a file on disk and could have been edited."""
+    if not context.note_path.exists():
+        raise PipelineError(
+            f"{context.note_path} is missing; run stages 6-8 (or `--from 6`) first."
+        )
+    markdown = context.note_path.read_text(encoding="utf-8")
+    assert_clean(markdown, context=context.note_path.name)
+    return markdown
+
+
+def _doc_blocks(context: RunContext, options: PipelineOptions) -> tuple[PulseNote, list[Block]]:
+    """The note as blocks, held to the same guarantees as `pulse.md` before it leaves."""
+    note = context.read_model(6, PulseNote)
+    blocks = render_blocks(
+        note,
+        corpus_size=len(context.read_models(3, Review)),
+        corpus_total=context.ledger.corpus_total,
+        generated_on=options.generated_on,
+    )
+    text = "\n".join(block.text for block in blocks)
+    assert_clean(text, context="the Google Doc blocks")
+    # A second render path must not undo stage 7's verbatim guarantee (P5-T5).
+    for quote in note.quotes:
+        if not any(quote.text in block.text for block in blocks):
+            raise PipelineError(f"Quote from {quote.review_id} did not survive block rendering.")
+    return note, blocks
+
+
+def stage_publish_doc(
+    context: RunContext, options: PipelineOptions, detail: dict[str, object]
+) -> None:
+    """Append the week's section to the standing Google Doc (implementation-plan.md §8.2)."""
+    mode = _require_mcp(options)
+    _publishable_markdown(context)
+    try:
+        document_id = require_document_id(options.settings)
+    except ConfigError as exc:
+        raise PipelineError(str(exc)) from exc
+    _, blocks = _doc_blocks(context, options)
+    previous = previous_publication(context.run_dir.parent, document_id, context.iso_week)
+
+    async def publish() -> PublishedSection:
+        async with connect_docs(options.settings, mode) as docs:
+            return await publish_section(
+                docs,
+                document_id=document_id,
+                iso_week=context.iso_week,
+                heading=blocks[0].text,
+                blocks=blocks,
+                previously_published_in=previous,
+                republish=options.republish,
+            )
+
+    try:
+        published = anyio.run(publish)
+    except McpClientError as exc:
+        raise PipelineError(str(exc)) from exc
+
+    if published.status == "skipped":
+        log.warning(
+            "week already published; not appending again",
+            extra={"iso_week": context.iso_week, "run": published.previously_published_in},
+        )
+    elif published.status == "dry_run":
+        log.warning("the MCP server is in DRY_RUN mode: nothing was written to the doc")
+
+    # A skip must never overwrite the record of a real publication. Replaying into the run
+    # that published would otherwise replace "appended" with "skipped" -- erasing the only
+    # evidence the week is in the doc, so the next run would append it again.
+    if published.previously_published_in != context.run_dir.name or published.status != "skipped":
+        context.write_artifact(9, published.summary())
+    context.ledger.document_url = published.url
+    detail.update(published.summary())
+
+
+def _earlier_draft(context: RunContext) -> dict[str, str] | None:
+    """The draft already made for this week's publication, if any.
+
+    The publication is this run's own (stage 9 appended here) or an earlier run's (stage 9
+    skipped, pointing at it). Either way, a draft that run already made is not repeated.
+    """
+    if not context.artifact_path(9).exists():
+        return None
+    published = context.read_artifact(9)
+    if published.get("status") == "appended":
+        publisher = context.run_dir.name
+    elif published.get("status") == "skipped":
+        publisher = published.get("previously_published_in") or ""
+    else:
+        return None
+    path = context.run_dir.parent / publisher / context.artifact_path(10).name
+    try:
+        draft_id = json.loads(path.read_text(encoding="utf-8")).get("draft_id")
+    except (OSError, json.JSONDecodeError):
+        return None
+    return {"draft_id": draft_id, "drafted_in": publisher} if draft_id else None
+
+
+def stage_draft_email(
+    context: RunContext, options: PipelineOptions, detail: dict[str, object]
+) -> None:
+    """Create the Gmail draft: the full note plus the doc link. Never sends."""
+    mode = _require_mcp(options)
+    try:
+        to = require_recipient(options.settings)
+    except ConfigError as exc:
+        raise PipelineError(str(exc)) from exc
+
+    document_url = context.ledger.document_url
+    if not document_url:
+        raise PipelineError(
+            "No published document is recorded for this run; run stage 9 first "
+            "(`pulse run --from 9`)."
+        )
+    note = context.read_model(6, PulseNote)
+    body = render_email_body(note, _publishable_markdown(context), document_url)
+    subject = email_subject(note)
+
+    # A week already published was drafted then too; a second draft is just clutter.
+    if (earlier := _earlier_draft(context)) and not options.republish:
+        log.warning("week already drafted; not creating another", extra=earlier)
+        record: dict[str, object] = {"status": "skipped", **earlier, "subject": subject}
+        if earlier["drafted_in"] != context.run_dir.name:
+            context.write_artifact(10, record)
+        detail.update(record)
+        return
+
+    async def draft() -> DraftRef:
+        async with connect_gmail(options.settings, mode) as gmail:
+            return await create_pulse_draft(gmail, to=to, subject=subject, body=body)
+
+    try:
+        created = anyio.run(draft)
+    except McpClientError as exc:
+        raise PipelineError(str(exc)) from exc
+
+    if created.dry_run:
+        log.warning("the MCP server is in DRY_RUN mode: no draft was created")
+    created_record: dict[str, object] = {
+        "status": "dry_run" if created.dry_run else "created",
+        "draft_id": created.draft_id,
+        "dry_run": created.dry_run,
+        "subject": subject,
+        "document_url": document_url,
+    }
+    context.write_artifact(10, created_record)
+    context.ledger.draft_id = created.draft_id
+    detail.update(created_record)
+
+
+# --------------------------------------------------------------------------------------
+# Startup probe (P4-T13, P5-T7)
+# --------------------------------------------------------------------------------------
+
+_PROBE_ADVICE: dict[ErrorCode, str] = {
+    ErrorCode.AUTH_REQUIRED: (
+        "The MCP server is not authorized with Google. Re-run `npm run auth` for the server "
+        "and update its GOOGLE_TOKEN_JSON_B64 -- this agent never handles Google credentials."
+    ),
+    ErrorCode.NOT_FOUND: (
+        "The configured Google Doc was not found, or is not shared with the account the MCP "
+        "server is authorized as. Check PULSE_DOC_ID."
+    ),
+    ErrorCode.PERMISSION_DENIED: (
+        "The MCP server refused access to the configured doc (no edit access, or not on its "
+        "ALLOWED_DOCUMENT_IDS)."
+    ),
+    ErrorCode.FEATURE_DISABLED: (
+        "A tool this agent needs is disabled on the server; it needs ENABLE_DOCS_APPEND and "
+        "ENABLE_GMAIL_DRAFTS set to true."
+    ),
+}
+
+
+def preflight(context: RunContext, options: PipelineOptions) -> None:
+    """Prove the MCP stages can succeed *before* any stage runs.
+
+    Discovering an unauthorized server after classifying 1,700 reviews would waste the
+    whole run's spend (architecture.md §11.6), so this runs ahead of stage 1, not stage 9.
+    """
+    publishes = options.from_stage <= DOC_STAGE <= options.to_stage
+    drafts = options.from_stage <= EMAIL_STAGE <= options.to_stage
+    if not (publishes or drafts):
+        return
+
+    mode = _require_mcp(options)
+    try:
+        document_id = require_document_id(options.settings) if publishes else None
+        if drafts:
+            require_recipient(options.settings)
+    except ConfigError as exc:
+        raise PipelineError(str(exc)) from exc
+
+    roles = (ROLES["docs"] if publishes else ()) + (ROLES["gmail"] if drafts else ())
+    result = anyio.run(partial(probe, options.settings, mode, roles, document_id=document_id))
+    for warning in result.warnings:
+        log.warning("mcp probe warning", extra={"detail": warning})
+    if result.ok:
+        log.info("mcp probe ok", extra={"detail": result.detail})
+        return
+
+    error = result.error
+    advice = _PROBE_ADVICE.get(error.code) if isinstance(error, McpToolError) else None
+    raise PipelineError("MCP startup probe failed: " + (advice or result.detail))
+
+
+# --------------------------------------------------------------------------------------
 # Dispatch
 # --------------------------------------------------------------------------------------
 
@@ -367,11 +614,9 @@ _STAGES: dict[int, StageFn] = {
     6: stage_draft,
     7: stage_validate,
     8: stage_render,
+    9: stage_publish_doc,
+    10: stage_draft_email,
 }
-
-
-def stage_is_implemented(stage: int) -> bool:
-    return stage in _STAGES
 
 
 def run_stages(context: RunContext, options: PipelineOptions) -> None:
@@ -387,13 +632,8 @@ def run_stages(context: RunContext, options: PipelineOptions) -> None:
     if options.from_stage > options.to_stage:
         raise PipelineError(f"--from ({options.from_stage}) is after --to ({options.to_stage}).")
 
+    preflight(context, options)
+
     for stage in range(options.from_stage, options.to_stage + 1):
-        handler = _STAGES.get(stage)
-        if handler is None:
-            raise StageNotImplemented(
-                f"Stage {stage} is not implemented yet; it arrives in "
-                f"{_PENDING_STAGES.get(stage, 'a later phase')}. "
-                f"Use --to {max(_STAGES)} to run what exists."
-            )
         with context.stage(stage) as detail:
-            handler(context, options, detail)
+            _STAGES[stage](context, options, detail)

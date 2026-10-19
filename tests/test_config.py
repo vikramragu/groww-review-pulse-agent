@@ -17,9 +17,12 @@ import pytest
 from pulse.config import (
     ConfigError,
     DocsConfig,
+    McpServerConfig,
     load_env_file,
     load_settings,
+    require_document_id,
     require_recipient,
+    resolve_token,
 )
 from pulse.models import Theme
 
@@ -40,25 +43,21 @@ min_confidence = 0.5
 
 [docs]
 title_template = "Groww Review Pulse — {week}"
-folder_id = ""
+document_id = ""
 """
 
 VALID_MCP_TOML = """
-contract = "pulse-mcp/1"
+contract_file = "contract/google-workspace-mcp-0.1.json"
 
-[docs]
-command = "python"
-args = ["-m", "pulse_mcp_servers.docs"]
+[live]
+transport = "http"
+url = "https://example.invalid/mcp"
+token_env = "PULSE_MCP_TOKEN"
 
-[docs.tools]
-find = "docs.find_document"
-
-[gmail]
-command = "python"
-args = ["-m", "pulse_mcp_servers.gmail"]
-
-[gmail.tools]
-create_draft = "gmail.create_draft"
+[live.tools]
+get_info = "docs_get_info"
+append = "docs_append_content"
+create_draft = "gmail_create_draft"
 """
 
 
@@ -120,7 +119,9 @@ def _clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_loads_the_committed_repository_config() -> None:
     """The config shipped in this repo must itself be valid."""
     settings = load_settings(Path("config"))
-    assert settings.mcp.contract == "pulse-mcp/1"
+    assert settings.mcp.live.transport == "http"
+    assert settings.mcp.live.url.startswith("https://")
+    assert settings.mcp.live.token_env == "PULSE_MCP_TOKEN"
     assert settings.pulse.window.weeks >= settings.pulse.window.min_weeks
     assert set(settings.themes.themes) == {theme.value for theme in Theme}
 
@@ -415,3 +416,39 @@ def test_the_committed_example_file_names_no_real_key() -> None:
     for line in example.splitlines():
         if line.startswith("GROQ_API_KEY="):
             assert line.split("=", 1)[1].startswith("gsk_your_")
+
+
+# --------------------------------------------------------------------------------------
+# Phase 5: the standing doc and the deployed server
+# --------------------------------------------------------------------------------------
+
+
+def test_the_doc_id_comes_from_the_environment(
+    config_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PULSE_DOC_ID", " 1AbC-scratch_doc ")
+    assert require_document_id(load_settings(config_path)) == "1AbC-scratch_doc"
+
+
+def test_a_missing_doc_id_says_how_to_find_it(config_path: Path) -> None:
+    with pytest.raises(ConfigError, match="PULSE_DOC_ID") as caught:
+        require_document_id(load_settings(config_path))
+    assert "document/d/<ID>" in str(caught.value)
+
+
+def test_the_token_is_never_read_from_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Config names the variable; only the environment holds the secret."""
+    server = McpServerConfig(transport="http", url="https://x.invalid/mcp", token_env="T_ENV")
+    with pytest.raises(ConfigError, match=r"T_ENV is not set.*\.env"):
+        resolve_token(server)
+    monkeypatch.setenv("T_ENV", "secret")
+    assert resolve_token(server) == "secret"
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"transport": "http", "url": ""}, {"transport": "http", "url": "ftp://x"}, {"command": ""}],
+)
+def test_a_server_without_its_transport_settings_is_rejected(fields: dict[str, str]) -> None:
+    with pytest.raises(ValueError):
+        McpServerConfig(**fields)  # type: ignore[arg-type]

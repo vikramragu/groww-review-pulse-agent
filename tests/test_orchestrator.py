@@ -132,9 +132,9 @@ def test_allocation_continues_past_a_gap(tmp_path: Path) -> None:
 
 
 def test_stage_tables_cover_the_documented_pipeline() -> None:
-    """Ten stages (architecture.md §6); seven of them write numbered JSON (§13)."""
+    """Ten stages (architecture.md §6); all but stage 8 (`pulse.md`) write numbered JSON."""
     assert sorted(STAGE_NAMES) == list(range(1, 11))
-    assert sorted(STAGE_ARTIFACTS) == list(range(1, 8))
+    assert sorted(STAGE_ARTIFACTS) == [1, 2, 3, 4, 5, 6, 7, 9, 10]
 
 
 def test_writes_and_reads_a_model_list_artifact(tmp_path: Path) -> None:
@@ -191,11 +191,10 @@ def test_reading_a_list_artifact_as_a_single_model_fails(tmp_path: Path) -> None
 
 
 def test_stages_without_json_artifacts_are_rejected(tmp_path: Path) -> None:
-    """Stages 8-10 produce pulse.md and ledger fields, not numbered JSON."""
+    """Stage 8 produces pulse.md, not numbered JSON."""
     context = start_run("2026-W41", tmp_path)
-    for stage in (8, 9, 10):
-        with pytest.raises(RunError, match="no JSON artifact"):
-            context.artifact_path(stage)
+    with pytest.raises(RunError, match="no JSON artifact"):
+        context.artifact_path(8)
 
 
 def test_completed_stages_reflects_what_exists_on_disk(tmp_path: Path) -> None:
