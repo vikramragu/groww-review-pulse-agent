@@ -40,7 +40,7 @@ the doc URL and the draft id.
 
 | What | Where |
 | --- | --- |
-| This agent (MCP **client**) | `/Users/betteropinions/Development/AI/agent-mcp`, branch `master` (main branch for PRs: `main`) |
+| This agent (MCP **client**) | [vikramragu/groww-review-pulse-agent](https://github.com/vikramragu/groww-review-pulse-agent) (public); local `/Users/betteropinions/Development/AI/agent-mcp`, branch `master` → `origin/main` |
 | MCP **server** (separate project) | [vikramragu/Mail-Docs-MCP-Server](https://github.com/vikramragu/Mail-Docs-MCP-Server), local `/Users/betteropinions/Development/AI/mcp-server` |
 | Server identity | `serverInfo.name = "google-workspace-mcp"`, version `0.1.0` |
 | Live server | `https://mail-docs-mcp-server-production.up.railway.app/mcp` (Railway; unauthenticated `GET /healthz` returns 200) |
@@ -92,8 +92,9 @@ config/{pulse,themes,mcp}.toml
 - `pulse doctor` → all checks pass against the live server and the standing doc.
 - Live 2026-W41: appended to the standing doc, draft created, same-week re-run skipped both.
 
-Everything is committed on `master`. There is **no git remote yet**: create an empty
-(private) GitHub repo and push.
+Pushed to [vikramragu/groww-review-pulse-agent](https://github.com/vikramragu/groww-review-pulse-agent)
+(public, for mentor review): local `master` tracks `origin/main`. Public, so the server
+should have `ALLOWED_DOCUMENT_IDS` and `ALLOWED_RECIPIENT_DOMAINS` set.
 
 ## Data: what the real corpus looks like
 
@@ -232,7 +233,8 @@ Stub state persists in `.cache/stub-mcp-state.json`; delete it to start from an 
 
 1. **P6-T9 sample pulse:** decide whether to commit the real 2026-W41 note (three short
    public quotes, scrubbed) as `docs/sample-pulse.md`, or point at the synthetic golden note.
-2. **Push:** create an empty private GitHub repo; add it as `origin`; push `master` as `main`.
+2. **Railway:** set `ALLOWED_DOCUMENT_IDS` (standing + scratch doc) and
+   `ALLOWED_RECIPIENT_DOMAINS`, redeploy, then `pulse doctor`.
 3. **Server repo:** its `docs/deployment-plan.md` still says Railway provisioning is left;
    it is deployed.
 4. Weekly operation per [runbook.md](runbook.md).
