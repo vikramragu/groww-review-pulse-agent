@@ -519,7 +519,32 @@ def run(
         if (record := outcomes.get(stage)) is not None:
             where = record.get("url") or record.get("draft_id") or record.get("document_url")
             typer.echo(f"{label}: {record.get('status', 'done')}  {where or ''}".rstrip())
+    _print_usage(context)
     _print_artifacts(context)
+
+
+def _print_usage(context: RunContext) -> None:
+    """One line of what the run's model calls cost (P6-T4), from the ledger's total.
+
+    An unknown price is said out loud rather than printed as $0: a run that looks free gets
+    repeated without thought.
+    """
+    usage = context.ledger.usage
+    if not usage.calls:
+        return
+    cost = (
+        f"~${usage.estimated_cost_usd:.4f}"
+        if usage.estimated_cost_usd is not None
+        else f"cost unknown (no price for {usage.model})"
+    )
+    parts = [
+        f"LLM: {usage.calls} call(s)",
+        f"{usage.input_tokens:,} in / {usage.output_tokens:,} out tokens",
+        cost,
+    ]
+    if (rate := context.ledger.classification_cache_hit_rate) is not None:
+        parts.append(f"classification cache hits {rate:.0%}")
+    typer.echo(" · ".join(parts))
 
 
 def _published_but_draft_failed(context: RunContext) -> bool:

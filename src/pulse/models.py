@@ -229,7 +229,14 @@ class RunLedger(BaseModel):
     window_weeks: int | None = None
     theme_counts: dict[str, int] = Field(default_factory=dict)
 
+    #: The run's total: the sum of `usage_by_stage`.
     usage: LlmUsage = Field(default_factory=LlmUsage)
+    #: Per model-calling stage ("classify", "draft"). A replay of a stage replaces its
+    #: entry. Kept apart so replaying stage 6 cannot erase stage 4's tokens, which a single
+    #: overwritten `usage` did.
+    usage_by_stage: dict[str, LlmUsage] = Field(default_factory=dict)
+    #: Share of reviews stage 4 served from the on-disk classification cache.
+    classification_cache_hit_rate: float | None = None
     draft_attempts: int = 0
 
     document_url: str | None = None

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import date
 from functools import partial
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import anyio
 
@@ -213,12 +213,44 @@ def stage_classify(
         enabled=options.use_cache,
     )
 
+    before = usage_for_ledger(llm)
     classified, report = classify_reviews(reviews, llm=llm, settings=options.settings, cache=cache)
 
     context.write_artifact(4, classified)
     context.ledger.theme_counts = dict(report.theme_counts)
-    context.ledger.usage = LlmUsage.model_validate(usage_for_ledger(llm))
+    context.ledger.classification_cache_hit_rate = round(report.cache_hit_rate, 3)
+    _record_usage(context, "classify", before, usage_for_ledger(llm))
     detail.update(report.summary())
+
+
+def _record_usage(
+    context: RunContext, stage_name: str, before: dict[str, Any], after: dict[str, Any]
+) -> None:
+    """Store what one stage spent, and recompute the run total from every stage.
+
+    A difference of snapshots, not the provider's running total, so a port shared across
+    stages (as tests inject one) is not counted twice.
+    """
+    counters = ("calls", "input_tokens", "output_tokens", "cached_input_tokens")
+    spent: dict[str, Any] = {
+        "provider": after["provider"],
+        "model": after["model"],
+        **{key: after.get(key, 0) - before.get(key, 0) for key in counters},
+    }
+    cost_after, cost_before = after.get("estimated_cost_usd"), before.get("estimated_cost_usd")
+    spent["estimated_cost_usd"] = (
+        cost_after - (cost_before or 0.0) if cost_after is not None else None
+    )
+    context.ledger.usage_by_stage[stage_name] = LlmUsage.model_validate(spent)
+
+    stages = list(context.ledger.usage_by_stage.values())
+    costs = [s.estimated_cost_usd for s in stages]
+    context.ledger.usage = LlmUsage(
+        provider=after["provider"],
+        model=after["model"],
+        **{key: sum(getattr(s, key) for s in stages) for key in counters},
+        estimated_cost_usd=None if any(c is None for c in costs) else sum(costs),  # type: ignore[arg-type]
+    )
 
 
 # --------------------------------------------------------------------------------------
@@ -283,6 +315,7 @@ def stage_draft(context: RunContext, options: PipelineOptions, detail: dict[str,
         if options.llm is not None
         else build_llm(options.settings, override=options.llm_override)
     )
+    before = usage_for_ledger(llm)
 
     try:
         outcome = draft_note(
@@ -298,6 +331,8 @@ def stage_draft(context: RunContext, options: PipelineOptions, detail: dict[str,
         # Every attempt's failures are persisted before the abort, so a developer can see
         # what the model actually got wrong rather than guessing from a log line.
         context.write_artifact(7, {"status": "aborted", "reason": str(exc)})
+        # A rejected draft still cost tokens.
+        _record_usage(context, "draft", before, usage_for_ledger(llm))
         # A replay that fails must not leave the previous draft behind: stages 9-10 read
         # these files, so a later `--from 9` would publish a note this run just rejected.
         context.artifact_path(6).unlink(missing_ok=True)
@@ -315,7 +350,7 @@ def stage_draft(context: RunContext, options: PipelineOptions, detail: dict[str,
     )
 
     context.ledger.draft_attempts = outcome.report.attempts
-    context.ledger.usage = LlmUsage.model_validate(usage_for_ledger(llm))
+    _record_usage(context, "draft", before, usage_for_ledger(llm))
     detail.update(outcome.report.summary())
 
 

@@ -20,6 +20,7 @@ from pulse.orchestrator import RunContext, start_run
 from pulse.pipeline import (
     PipelineError,
     PipelineOptions,
+    _record_usage,
     run_stages,
 )
 
@@ -574,3 +575,66 @@ def test_replaying_normalize_after_deletion_says_why(
 
     with pytest.raises(PipelineError, match="--from 1"):
         run_stages(context, options(pruning_settings, tmp_path, from_stage=2))
+
+
+# --------------------------------------------------------------------------------------
+# Ledger usage (P6-T3) -- per stage, never overwritten by a later stage
+# --------------------------------------------------------------------------------------
+
+
+def snapshot(calls: int, tokens_in: int, tokens_out: int, cost: float | None = None) -> dict:
+    return {
+        "provider": "fake",
+        "model": "m",
+        "calls": calls,
+        "input_tokens": tokens_in,
+        "output_tokens": tokens_out,
+        "cached_input_tokens": 0,
+        "estimated_cost_usd": cost,
+    }
+
+
+def test_drafting_does_not_erase_classification_usage(tmp_path: Path) -> None:
+    """Found on the real run: the ledger said 1 call after 43 classification batches,
+    because stage 6 overwrote stage 4's usage."""
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    _record_usage(context, "classify", snapshot(0, 0, 0), snapshot(43, 118_000, 64_000))
+    _record_usage(context, "draft", snapshot(0, 0, 0), snapshot(1, 2_300, 1_400))
+
+    usage = context.ledger.usage
+    assert usage.calls == 44
+    assert usage.input_tokens == 120_300
+    assert set(context.ledger.usage_by_stage) == {"classify", "draft"}
+
+
+def test_a_shared_port_is_counted_by_difference(tmp_path: Path) -> None:
+    """One port for both stages (as tests inject) reports a running total; only what each
+    stage added is attributed to it."""
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    _record_usage(context, "classify", snapshot(0, 0, 0), snapshot(3, 300, 30))
+    _record_usage(context, "draft", snapshot(3, 300, 30), snapshot(4, 400, 50))
+
+    assert context.ledger.usage_by_stage["draft"].calls == 1
+    assert context.ledger.usage.calls == 4
+
+
+def test_replaying_a_stage_replaces_only_its_own_entry(tmp_path: Path) -> None:
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    _record_usage(context, "classify", snapshot(0, 0, 0), snapshot(43, 1000, 100))
+    _record_usage(context, "draft", snapshot(0, 0, 0), snapshot(1, 10, 10))
+    _record_usage(context, "draft", snapshot(0, 0, 0), snapshot(2, 20, 20))
+
+    assert context.ledger.usage.calls == 45
+
+
+def test_an_unknown_price_makes_the_total_cost_unknown(tmp_path: Path) -> None:
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    _record_usage(context, "classify", snapshot(0, 0, 0), snapshot(1, 1, 1, cost=0.5))
+    _record_usage(context, "draft", snapshot(0, 0, 0), snapshot(1, 1, 1, cost=None))
+    assert context.ledger.usage.estimated_cost_usd is None
+
+
+def test_stage_four_records_its_cache_hit_rate(settings: Settings, tmp_path: Path) -> None:
+    context, _ = run_to_classify(settings, tmp_path)
+    assert context.ledger.classification_cache_hit_rate is not None
+    assert context.ledger.usage_by_stage["classify"].calls > 0
