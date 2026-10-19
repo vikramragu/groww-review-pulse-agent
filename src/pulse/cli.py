@@ -42,6 +42,7 @@ from pulse.llm import LlmError, list_groq_models, probe_schema_support
 from pulse.mcp.adapters import ConformanceResult, check_conformance
 from pulse.models import Theme
 from pulse.orchestrator import (
+    DEFAULT_RUNS_ROOT,
     STAGE_NAMES,
     RunContext,
     RunError,
@@ -594,6 +595,36 @@ def _print_artifacts(context: RunContext) -> None:
     for stage in stages:
         path = context.artifact_path(stage)
         typer.echo(f"  {path.name}  ({path.stat().st_size / 1024:.1f} KiB)")
+
+
+@app.command()
+def snapshot(
+    run_dir: Annotated[
+        Path | None,
+        typer.Option("--run-dir", help="Run to export. Default: the latest run with a note."),
+    ] = None,
+    out: Annotated[Path, typer.Option("--out", help="Directory to write <week>.json into.")] = Path(
+        "snapshots"
+    ),
+) -> None:
+    """Export a run as the public dashboard's read-only snapshot.
+
+    Keeps the published note and the figures; withholds review ids, quote candidates and
+    the draft id. Refuses a note that fails a check or a snapshot the PII scanner flags.
+    """
+    from pulse.ui.data import SnapshotError, export_snapshot, list_runs, write_snapshot
+
+    target = run_dir or next(iter(list_runs(DEFAULT_RUNS_ROOT)), None)
+    if target is None:
+        typer.secho("No run with a finished note to export.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+    try:
+        written = write_snapshot(export_snapshot(target), out)
+    except SnapshotError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+    typer.secho(f"Wrote {written} from {target}", fg=typer.colors.GREEN)
+    typer.echo("Review it, commit it, and the public dashboard shows it on its next load.")
 
 
 @app.command()

@@ -1,0 +1,2 @@
+# Streamlit Community Cloud installs from this file. The app runs in snapshot mode there.
+.[ui]
