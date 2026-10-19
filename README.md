@@ -15,7 +15,7 @@ calls. See [docs/architecture.md §1.1](docs/architecture.md).
 | [docs/problemStatement.md](docs/problemStatement.md) | Requirements, constraints, acceptance checklist |
 | [docs/architecture.md](docs/architecture.md) | Design, decisions, and the `pulse-mcp/1` tool contract |
 | [docs/implementation-plan.md](docs/implementation-plan.md) | Phase-by-phase build plan |
-| [docs/input-format.md](docs/input-format.md) | The review export format the file-drop adapter reads |
+| [docs/input-format.md](docs/input-format.md) | The review export format, and how to fetch one |
 
 ## Status
 
@@ -44,6 +44,7 @@ pip install -e ".[dev]"
 pulse doctor            # check environment, config, credentials, input, MCP servers
 pulse themes            # show the configured theme taxonomy
 pulse models --probe    # list provider models and test their JSON-schema support
+pulse fetch --dry-run   # check the review source without writing anything
 pulse version
 ```
 
@@ -51,10 +52,30 @@ Run `pulse doctor` first — it reports what is not yet ready rather than lettin
 discover it halfway through. Warnings (no review export yet, no draft recipient) do not
 fail the command; genuine problems do.
 
+### Getting review data
+
+```bash
+pip install -e '.[scraper]'    # optional extra; the default install has no network code
+pulse fetch                     # downloads the window into data/raw/
+pulse fetch --dry-run           # one page, report only, writes nothing
+```
+
+`pulse fetch` downloads public Play Store reviews, newest-first, stopping at the start of
+the configured window. Reviewer identity is dropped at the edge, so it never reaches the
+export file.
+
+It is deliberately **not** a pipeline stage — the pipeline only ever reads files, which
+makes it structurally incapable of network access. [architecture.md O1](docs/architecture.md)
+explains that choice and is candid about the terms-of-service trade-off: there is no
+official public export of Play Store reviews for a non-owner of the app, so this reads
+Google's undocumented endpoints. For commercial use, prefer a licensed provider.
+
+You can equally drop in an export from anywhere else that matches
+[the documented format](docs/input-format.md).
+
 ### Running the pipeline
 
-Drop a public Play Store export into `data/raw/` (format:
-[docs/input-format.md](docs/input-format.md)), then:
+With an export in `data/raw/`:
 
 ```bash
 pulse run --dry-run                           # the whole analysis: stages 1-8

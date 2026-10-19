@@ -80,6 +80,7 @@ point in code. This table is the spine of the design.
 | Public exports only | No network fetch in the default adapter; adapter registry is explicit opt-in | `ingest/` | Structurally impossible to violate by default |
 | Play Store only (D10) | `Source` enum has one member | `models.py` | Schema validation error on any other source |
 | 8–12 week window | Date-range filter applied at normalization | `normalize.py` | Run aborts if corpus window is outside tolerance |
+| Analysable corpus | Substance filters: letters present, Latin script, not romanized Hindi, more than 8 words | `normalize.py` | Counted per reason; both totals disclosed in the note |
 | ≤5 themes | Closed `Theme` enum — the model classifies *into* it, never invents | `models.py` | Schema validation error |
 | Top 3 themes in note | Deterministic ranking + slice before the note prompt | `aggregate.py` | n/a — code picks, not the model |
 | 3 quotes | Schema `min_length=3, max_length=3` (Pydantic v2 list constraints) | `models.py` | Schema validation error |
@@ -527,7 +528,7 @@ ingest, so they are absent from every artifact rather than merely from stage 2 o
 | UPI handle | `\S+@(okaxis\|oksbi\|okhdfcbank\|ybl\|paytm\|upi\|…)` | `[upi]` |
 | URL | regex | `[link]` |
 | `@handle` | regex | `[handle]` |
-| Long digit runs (catch-all) | ≥9 consecutive digits not already matched | `[number]` |
+| Long digit runs (catch-all) | ≥9 digits, optionally split by single spaces or hyphens, not already matched. Counts digits, not characters, so an ISO date (8 digits) is not redacted | `[number]` |
 
 **Layer 3 — self-identification.** Patterns like `my name is X`, `I am X from Y`, and
 `contact me at` redact the trailing span. Deliberately conservative: it will occasionally redact a
@@ -535,6 +536,54 @@ non-name, which costs a quote candidate. That is the right trade — a lost cand
 the reader, while a leaked name violates a hard constraint.
 
 **Layer 4 — the pre-publish rescan** in stage 7, running the same detector over the rendered note.
+
+### Substance filtering (stage 2) and the sampling bias it introduces
+
+A third of real Groww reviews are a single word ("good", "ok", "nice") and two thirds are
+three words or fewer. The rule, decided 2026-10-15: **classify only English reviews of more
+than 8 words.** Four checks in stage 2 implement it, applied in this order and counted
+under the first one that fires, so the cost of each is visible:
+
+| Rule | Why | Removed from the real 12-week corpus (8,812 in window) |
+| --- | --- | --- |
+| No letters at all (emoji, punctuation) | Nothing to classify | 231 (2.6%) |
+| More than 30% non-Latin letters | A script the English classifier prompt cannot read | 145 (1.6%) |
+| Romanized Hindi (Hinglish) | Not English, though in Latin script | 471 (5.3%) |
+| Fewer than `min_review_words` (default **9**) | No topic to find | 6,257 (71%) |
+| **Kept** | | **1,708 (19.4%)**, ≥86 in every week |
+
+Only tokens containing a letter count as words, so emoji and bare numbers ("₹500") cannot
+pad a review over the floor.
+
+**The filtering is load-bearing, not cosmetic.** Left in, these reviews land in
+`unclassified` and swell the denominator every theme share is measured against — "payments
+was 25% of the week" would be mostly measuring noise.
+
+**Romanized Hindi is detected with a word list, not a model.** `HINDI_MARKERS` holds
+Hindi function words that are not also English words (so "me", "main", "to" are excluded);
+`ENGLISH_MARKERS` holds English function words. A review is dropped when ≥20% of its words
+are Hindi markers and <15% are English markers, or when Hindi markers alone reach 40%.
+English reviews that borrow a word ("paisa still not credited") are kept. The lists are
+versioned (`ROMANIZED_LEXICON_VERSION`, recorded in the stage 2 report) so a shift in
+corpus size between runs can be traced to the lexicon. A language-ID library was rejected:
+it would make `02_normalized.json` depend on a model and a library version, and its
+mistakes could not be pinned as test cases. Measured on 109 inspected real reviews: no
+English review dropped, about 4% of kept reviews still non-English (mostly Hinglish
+spelling "hai" as "he", which cannot be listed because "he" is English).
+
+**These filters are sample selection, and they are not neutral.** The language rules
+remove users who write in Indian languages — plausibly those having the most onboarding
+and KYC difficulty. The word floor removes brief reviewers, who skew positive: 77% of the
+raw corpus is 5★, but in the kept corpus 1★ (705) outnumbers 5★ (606). So a theme share,
+and a theme's mean rating, describe *substantive English-language* reviews, not Groww's
+users.
+
+The mitigation is disclosure rather than correction: the ledger keeps `corpus_total`
+alongside `corpus_size`, and the rendered note's metadata line states both —
+`1,708 substantive reviews of 8,812 in window`. Without that, a reader takes the share for
+a population statistic. The floor is configurable (`thresholds.min_review_words`); lowering
+it recovers the 4–8 word band, which contains genuinely classifiable text like "withdrawal
+pending since last week".
 
 A quote that still contains a placeholder after scrubbing is dropped from the candidate pool rather
 than published with `[phone]` in the middle of it.
@@ -552,6 +601,29 @@ pipeline holds no Google credentials and contains no Google REST calls.
 Per [D8](#2-resolved-decisions), the servers are a **separate project**. This section therefore has
 two jobs: specify the contract this agent requires of them (§11.2), and describe the client that
 consumes it (§11.1, §11.3).
+
+### 11.0 As built (Phase 5, 2026-10-16) — read this first
+
+The servers project shipped as **`google-workspace-mcp` 0.1.0**
+([vikramragu/Mail-Docs-MCP-Server](https://github.com/vikramragu/Mail-Docs-MCP-Server)), deployed
+at `https://mail-docs-mcp-server-production.up.railway.app/mcp`. It is a general-purpose server
+with its own interface, **not** `pulse-mcp/1`. The agent was adapted to it (implementation-plan.md
+§8.1, option A). §11.2–§11.6 below are kept as the original design. Where they disagree with this
+section, this section wins.
+
+| Topic | Original design (§11.1–§11.6) | As built |
+| --- | --- | --- |
+| Transport (X2) | stdio subprocess per server | Streamable HTTP, stateless, `POST /mcp`, `Authorization: Bearer <PULSE_MCP_TOKEN>`. stdio is kept for the in-repo stub. |
+| Servers (X5) | two: Docs, Gmail | **one** server, both tool groups |
+| Contract (X1) | `pulse-mcp/1`, equality of schemas | **Consumer-driven** `contract/google-workspace-mcp-0.1.json`: what we send (example request validated against the server's advertised schema) and what we read (fields that must stay declared). Server identity is `serverInfo.name` + semver; 0.x minors abort. |
+| Docs tools | find / create / replace-body | `docs_get_info(document)` and `docs_append_content(document, blocks[])` only |
+| Publishing (§11.5) | one doc per week, found by title, body replaced | **One standing doc** (`PULSE_DOC_ID`, created by hand). Each week is appended as a section headed `Groww Review Pulse — <week>`. |
+| Idempotency | find-by-title on the server | **Agent's own record**: a week already `appended` to the doc per any run's `09_published.json` is skipped (`--republish` overrides). Local state, so a clean checkout forgets it. |
+| Content format | CommonMark string | Typed blocks (`render_blocks`), the same content as `pulse.md`. Quotes are checked verbatim in the blocks before sending. |
+| Errors | `structuredContent.code` | Prose only. Classified by ordered message rules in the contract file; an unknown message maps to `UPSTREAM_ERROR`. Google 429/5xx is retried by the server, then by the agent (`UNAVAILABLE`, 3 attempts). |
+| Send tool | absent by design | `gmail_send_email` exists on the server. The agent **refuses to bind** any tool matching `never_bind: ["send"]`, and the owner disables it on Railway (D-1). |
+| Auth probe (§11.6) | `find_document` (Docs only) | `docs_get_info(<configured doc>)` before stage 1. One Google token serves both APIs, so this proves Gmail is authorized too, except for a missing Gmail *scope*. |
+| Re-run drafts | a new draft every run | Stage 10 skips if the publishing run already made a draft (`--republish` overrides). |
 
 ### 11.1 Client topology
 
@@ -588,6 +660,9 @@ async def call_mcp_tool(server: ServerConfig, tool: str, args: dict) -> dict:
 ```
 
 ### 11.2 The tool contract: what this agent requires
+
+> **Superseded by §11.0.** This is the original `pulse-mcp/1` design, archived at
+> `contract/archive/pulse-mcp-1.json`. The deployed server implements a different interface.
 
 **Normative.** This section is the interface between the two projects. The servers project
 implements it; this agent consumes it. Changes require agreement on both sides and a version bump.
@@ -674,6 +749,23 @@ The last row is the thing that keeps two independently-released projects from dr
 quietly. A contract mismatch should surface at startup with a clear message, not as a confusing
 argument error in stage 9.
 
+**Pinned down by `contract/pulse-mcp-1.json` (P4-T1)** — two things this prose left open:
+
+- **Where the version lives:** `serverInfo.version`, formatted `pulse-mcp/<major>.<minor>`
+  (currently `pulse-mcp/1.0`). The agent's expected version is `contract` in
+  `config/mcp.toml`; a test keeps it equal to the file's.
+- **Error shape:** a failed call returns `isError: true` with `structuredContent`
+  `{"code": <one of the six>, "message": str, "retry_after_seconds": number|null}`, and the
+  same object as JSON text in `content`. An error without a valid `code` is treated as a
+  protocol violation, not retried.
+
+**Found while building the stub — for the X1 review:** `list_tools()` works without
+credentials by design, so it cannot reveal `AUTH_REQUIRED`. The startup probe therefore calls
+the read-only `docs.find_document` to prove Docs is authorized. **Gmail has no read-only
+tool**, so its authorization is only discovered at stage 10 — after LLM spend. Options for
+`pulse-mcp/1.1`: a `gmail.auth_status` tool, or a contract rule that an unauthorized server
+reports it in `initialize`.
+
 ### 11.3 Agent-side ports and binding
 
 The pipeline depends on two Protocols, never on MCP directly. Stage 9 and 10 can therefore be
@@ -686,6 +778,10 @@ class DocsPort(Protocol):
 class GmailPort(Protocol):
     async def create_draft(self, to: str, subject: str, body: str) -> DraftRef: ...
 ```
+
+**As built (P4-T7):** the ports live in `publish/ports.py`, and `DocsPort` exposes
+`find` / `create` / `replace` rather than one `upsert_pulse_doc`, so the find-then-replace
+decision lives in `publish/docs.py` (stage 9) where it is tested with an in-memory fake.
 
 `McpDocsAdapter` / `McpGmailAdapter` implement these over `ClientSession`, and they are the only
 place in the codebase that knows a tool name. Tool names stay config-driven even though we now own
@@ -729,6 +825,9 @@ artifact.
 Integration with the real servers is then a config change (`--mcp live`), not a code change.
 
 ### 11.5 Publishing semantics
+
+> **Superseded by §11.0:** one standing doc, a section appended per week, and agent-side
+> idempotency. The text below describes the original per-week-doc design.
 
 **Docs (stage 9).** Idempotent by title convention: `Groww Review Pulse — <ISO week>`. The
 publisher calls `find_document`; found → `replace_document_body`, preserving the URL so a re-run
@@ -808,6 +907,8 @@ agent-mcp/
 │       ├── 06_note.json
 │       ├── 07_validation.json
 │       ├── pulse.md
+│       ├── 09_published.json     # document id, URL, revision, created|replaced
+│       ├── 10_draft.json         # draft id, subject, doc URL it points at
 │       └── run.json              # ledger: timings, token usage, doc URL, draft id
 ├── src/pulse/
 │   ├── __init__.py
@@ -829,11 +930,15 @@ agent-mcp/
 │   │   ├── render.py
 │   │   └── validate.py
 │   ├── publish/
-│   │   ├── docs.py
-│   │   └── gmail.py
+│   │   ├── ports.py               # DocsPort / GmailPort — all stages 9-10 depend on
+│   │   ├── docs.py                # find-then-create/replace, conflict handling
+│   │   ├── gmail.py
+│   │   └── retry.py               # RATE_LIMITED, honouring retry_after_seconds
 │   └── mcp/
+│       ├── contract.py            # loads contract/pulse-mcp-1.json; versions, error codes
+│       ├── errors.py
 │       ├── session.py             # ClientSession lifecycle, stdio transport
-│       ├── discovery.py           # list_tools, contract-version check, binding
+│       ├── discovery.py           # list_tools, contract-version check, binding, drift
 │       └── adapters.py            # McpDocsAdapter / McpGmailAdapter (only tool-name knowledge)
 ├── tests/
 │   ├── fixtures/reviews_sample.json
@@ -975,7 +1080,7 @@ not just data-hygiene work.
 | Fixed 5-theme taxonomy | Unsupervised clustering (embeddings + k-means) per run | Cluster identity drifts between runs, so week-over-week deltas become meaningless — and the deltas are what make a *weekly* pulse worth reading. Also needs a mapping step to produce human labels anyway. |
 | Deterministic spine | Single agentic loop with MCP tools attached | Far less code, but the hard constraints become hopes. Also unreproducible: the same corpus could yield a compliant note one day and a 300-word one the next. |
 | Direct MCP calls from code | Messages API MCP connector (model calls the tools) | Publishing needs no model judgment. Putting the model in the loop adds cost, latency, and a failure mode where it decides to edit the note en route. |
-| File-drop ingestion | Play Store scraping library | No official public export exists for a non-owner of the app, so automated retrieval sits in tension with the stated constraint. The adapter interface leaves this addable as an explicit, documented opt-in. |
+| File-drop ingestion **plus a separate `pulse fetch`** | Registering a scraper as a pipeline `ReviewSource` | Keeping the scraper out of the registry makes the pipeline structurally incapable of network access, rather than merely configured not to use it. The fetch produces an export file; the pipeline reads files only. See O1 for the ToS trade. |
 | Substring verification | Trusting the prompt's "verbatim" instruction | Models tidy quotes. This is the single most likely silent violation in the whole system. |
 | Pydantic cardinality | Post-hoc count checks | Same effect, but the schema version also constrains generation, so the model usually gets it right first time. |
 | Per-stage JSON artifacts | In-memory pipeline | Artifacts make replay, audit, and quote provenance nearly free. The cost is disk and a gitignore entry. |
@@ -993,12 +1098,51 @@ not just data-hygiene work.
 
 | # | Question | Needed by | Note |
 | --- | --- | --- | --- |
-| O1 | Which concrete public **Play Store** export supplies the reviews, and in what format? | Phase 1 | Shapes `file_drop.py`'s parser. The adapter boundary means this is a small, contained change. |
+| O1 | ~~Which concrete public **Play Store** export supplies the reviews?~~ | — | **Resolved 2026-10-12: `pulse fetch` creates the export** using `google-play-scraper`, window-bounded and newest-first. See the ToS note below — this was a knowing trade, not an oversight. |
 | O2 | ~~Is the iOS App Store in scope?~~ | — | **Closed 2026-10-09: no, deferred (D10).** Re-opening it costs one `Source` member plus one adapter; nothing else in the design assumes a single store. |
 | O3 | Recipient address for the Gmail draft | Phase 5 | Config-only. |
 | O4 | Does the pulse doc live in a specific Drive folder? | Phase 5 | `create_document` already reserves `folder_id`; needs a value, and the servers project must honour it. |
 | O5 | Should a cheaper model handle bulk classification? | Phase 2 | A real cost lever (classification is ~95% of token volume), but a quality trade-off and therefore the user's call, not a default. Measure classification agreement on a labeled sample before switching. |
 | O6 | Retention policy for `runs/01_raw.json` | Phase 1 | The only artifact that may hold PII. |
+
+### O1: how review data is actually obtained
+
+problemStatement.md §6 requires "public review **exports only** — no scraping behind store
+logins, no ToS-violating automation". The difficulty, flagged from the first draft of this
+document: **there is no official public export of Play Store reviews for a non-owner of the
+app.** Play Console exports are owner-only and Groww is not ours.
+
+The options, and why one was chosen:
+
+| Option | Satisfies §6 as written? | Chosen? |
+| --- | --- | --- |
+| `google-play-scraper` | **Partly.** No account, no login, no authentication bypass — it reads what any visitor sees. But it calls Google's undocumented endpoints, and Google's terms broadly prohibit automated access, which is the second half of the constraint. | **Yes**, knowingly, 2026-10-12 |
+| Licensed provider (SerpApi, Appbot, AppFollow, DataForSEO) | Yes — contractually permitted | No: cost, for a learning project. The honest path for anything commercial. |
+| Play Console export | Yes, but owner-only | Unavailable |
+| Public dataset (Kaggle etc.) | Unclear; redistribution terms vary, and it would be stale | No |
+
+Three design choices keep the trade as small as possible:
+
+1. **Fetching is not a pipeline stage.** `pulse fetch` is a separate command and the
+   scraper is *not* in the `ReviewSource` registry, so the pipeline is structurally
+   incapable of network access — stronger than making it opt-in. The fetch produces a file;
+   the pipeline reads a file, as §3's "public exports only" row intends.
+2. **The download is archived**, so re-running the pipeline never re-fetches.
+3. **Bounded and paced.** Newest-first, stopping at the window start rather than fetching
+   everything; one second between pages, with a hard page cap so a broken stop condition
+   cannot become a flood. Reviewer identity (`userName`, `userImage`) is dropped at the
+   edge, so it is absent from the export file itself.
+
+`google-play-scraper` is an **optional** dependency (`pip install -e '.[scraper]'`), so the
+default install contains no network-capable code at all.
+
+**Known bias:** the fetch requests `lang=en`. Groww's users review in many Indian
+languages, and those reviews are excluded. The classifier prompt is English, so including
+them would mostly produce unclassified rows — but the resulting corpus is an
+English-speaking subset, not a representative sample, and a pulse drawn from it should be
+read that way.
+
+---
 
 ### Cross-project decisions (need agreement with the servers project)
 

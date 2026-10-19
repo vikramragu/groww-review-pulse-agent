@@ -2,7 +2,10 @@
 
 > Phase-by-phase build plan for the agent described in [architecture.md](architecture.md),
 > delivering the requirements in [problemStatement.md](problemStatement.md).
-> Status: **Phases 0–3 complete; Phase 4 next (needs X1 agreed).** Last updated: 2026-10-12.
+> Status: **Phases 0–4 complete. Phase 5 (option A, adapt to the deployed
+> `google-workspace-mcp`) is built and green against the stub over stdio and HTTP (§8.5). The
+> live run waits on the MCP token and doc IDs. Open product decision: `onboarding_kyc` below
+> the 5% floor (§5.1).** Last updated: 2026-10-16.
 
 ---
 
@@ -33,8 +36,8 @@ Three open items from architecture.md §20. Only one of them actually blocks sta
 
 | Item | Blocks | Can we start without it? |
 | --- | --- | --- |
-| **O1** — which concrete Play Store export, in what format | Phase 1 real data | **Yes.** Build against the canonical internal format and a synthetic fixture (P1-T1); the real parser is a contained adapter change later. |
-| **X1** — contract `pulse-mcp/1` sign-off | Phase 4 | **Yes for phases 0–3.** Needs agreement before Phase 4 starts. Start the review now — it's a document review, not an implementation. |
+| ~~**O1** — which concrete Play Store export~~ | — | **Resolved 2026-10-12.** `pulse fetch` creates the export via `google-play-scraper`, window-bounded and outside the pipeline. The ToS trade-off is recorded in architecture.md O1 rather than hidden. |
+| ~~**X1** — contract `pulse-mcp/1` sign-off~~ | — | **Superseded 2026-10-15.** The servers project shipped its own interface (`google-workspace-mcp` 0.1.0). The agent adapts to it in Phase 5 (§8.1, option A). |
 | **O3** — Gmail draft recipient | Phase 5 only | Yes. Config value. |
 
 **The one thing to do today, in parallel with Phase 0:** send architecture.md §11.2 to whoever owns
@@ -81,7 +84,7 @@ P1 → P2 → P3.
 | P2 | Classification + caching | 1.5 d | No |
 | P3 | Aggregate, draft, validate, render, `--dry-run` | 2.5–3 d | No |
 | P4 | Contract, stub server, MCP client, publish | 2–2.5 d | Needs X1 agreed |
-| P5 | Live integration | 0.5–1 d | **Yes** — servers project |
+| P5 | Live integration — adapt to the deployed server (replanned, §8) | ~~0.5–1 d~~ **2–3 d** | No longer blocked; needs D-1–D-5 and an MCP token |
 | P6 | Hardening, golden tests, ledger, docs | 1–1.5 d | No |
 | | **Total** | **~10–13 d** | |
 
@@ -252,7 +255,7 @@ clamped, 2 rows dropped) → 241 scrubbed, spanning 13 weeks, 22 PII hits across
 
 ---
 
-## 5. Phase 2 — Classification ✅ COMPLETE (2026-10-12)
+## 5. Phase 2 — Classification 🔄 T1–T10 complete (2026-10-12); §5.1 in progress
 
 **Goal:** every review in the corpus labelled with one of the five themes or `None`, cheaply and
 repeatably.
@@ -358,7 +361,166 @@ overhead.
 genuine taxonomy seams ("OTP never arrives" sits between `app_reliability` and
 `onboarding_kyc`). That is ~5% label noise flowing into Phase 3's theme counts. Left
 unfixed deliberately: the fixture is synthetic, so sharpening the prompt against it would
-be optimising for fiction. Revisit when real reviews are available (O1).
+be optimising for fiction. Revisit when real reviews are available (O1). Real reviews are
+now available, so this is P2-T17 in §5.1.
+
+### 5.1 Phase 2 reopened — filtering the real corpus 🔄 IN PROGRESS (2026-10-15)
+
+**Why reopened.** Everything above was built and measured against the 263-row synthetic
+fixture. `pulse fetch` has since produced a real export, and most of it is not classifiable
+text. The rule, decided 2026-10-15: **classify only English reviews of more than 8 words.
+Emoji-only and non-English reviews are removed before stage 4.**
+
+**Where the filter lives.** The filter runs in stage 2, after windowing (`filter_substantive` in
+`normalize.py`), not in stage 4. It is listed under Phase 2 because its job is to decide what
+the classifier sees. Running it at stage 2 means stages 3–4 never scrub or pay for text that
+will be thrown away, and the ledger records both `corpus_total` (the window) and `corpus_size`
+(the analysable subset).
+
+#### Is the download sound? Audit of `data/raw/com-nextbillion-groww-2026-10-11.json`
+
+| Check | Result | Verdict |
+| --- | --- | --- |
+| Rows / schema | 12,800 rows. All have exactly `app_version, date, external_id, rating, source, text` | ✅ |
+| Identity fields | No reviewer name, avatar, or reply fields. The fetcher dropped them at source | ✅ |
+| Window coverage | 2026-07-20 (Mon) → 2026-10-11 (Sun): **exactly 12 complete ISO weeks**, W30–W41, 847–1,358 rows/week | ✅ |
+| Duplicate `external_id` | 0 | ✅ |
+| Empty text | 0 | ✅ |
+| After normalize (dedupe on text + date) | 12,800 → **8,812**. The drops are mostly same-day repeats of "good" / "nice" | ✅ expected |
+| Rating skew | 77% are 5★ (9,884). 1★ is 10% | ⚠️ see below |
+| Language | `lang=en` was requested, but 145 rows are mostly non-Latin script (Devanagari 84, Bengali, Gujarati, Kannada, Tamil, Telugu) and ~200+ are romanized Hindi | ⚠️ the `lang` hint is not a filter |
+
+The download is complete and correctly shaped. **`lang=en` cannot be relied on as a language
+filter**, so the pipeline has to apply its own.
+
+#### What survives the filter (measured on the real file with the project's own code)
+
+8,812 normalized reviews in the window:
+
+| Removed by | ≥8 words (current code) | **>8 words (decided rule)** |
+| --- | --- | --- |
+| Emoji / punctuation only | 231 | 231 |
+| Non-Latin script (>30% non-Latin letters) | 145 | 145 |
+| Too short | 6,276 | 6,491 |
+| **Kept** | **2,160 (24.5%)** | **1,945 (22.1%)** |
+| Kept per week (min / median / max) | 109 / 180 / 282 | 97 / 161 / 259 |
+| Target week 2026-W41 | 173 | 160 |
+
+Every week stays far above the 20-review floor (P3-T5), so the stricter rule costs no weeks.
+
+**Gaps found in the code on 2026-10-15** (each one became a task below; all now fixed):
+
+1. **Off-by-one.** `word_count(text) < min_words` with `min_words = 8` *keeps* 8-word reviews,
+   which is "at least 8", not "more than 8". 215 reviews depend on this.
+2. **Emoji count as words.** `word_count` splits on whitespace, so `"if some wonderful app
+   application and thank you 🙏"` has 9 tokens and passes, though it has only 8 words. 191 kept
+   reviews contain emoji.
+3. **Romanized Hindi is kept on purpose.** `MAX_NON_LATIN_RATIO` catches Devanagari but not
+   `"Isme bond ka monthly payout correct ni show karta hai"`. About **149 of the 1,945** kept
+   reviews look like Hinglish. The code comment argues for keeping them. The 2026-10-15
+   decision overrides that comment: they are not English and they are removed.
+
+| ID | Task | Files | Done |
+| --- | --- | --- | --- |
+| P2-T11 | Emoji-only / punctuation-only reviews dropped (`has_letters`) | `src/pulse/ingest/normalize.py` | ✅ |
+| P2-T12 | Non-Latin-script reviews dropped (`non_latin_ratio > 0.3`) | `src/pulse/ingest/normalize.py` | ✅ |
+| P2-T13 | **"More than 8 words."** Change the rule to `word_count > 8` and rename the setting to `thresholds.min_review_words_exclusive = 8`, or set `min_review_words = 9`. Pick one, and make the config comment, the drop reason string, and the test boundary say the same thing. Test that 8 words are dropped and 9 are kept | `normalize.py`, `config/pulse.toml`, `tests/test_normalize.py` | ✅ `min_review_words = 9` (inclusive minimum); reason `"fewer than 9 words"` |
+| P2-T14 | **Count only lexical words.** `word_count` counts only tokens that contain at least one letter, so emoji, `!!!`, and `₹500` don't count toward the floor. Emoji *inside* a kept review are left in `Review.text`, because P3-T13 requires quotes to be exact substrings of it | `normalize.py`, `tests/test_normalize.py` | ✅ |
+| P2-T15 | **Romanized-Hindi (Hinglish) filter**, deterministic with no new dependency: drop a review when ≥20% of its tokens are in a curated Hindi function-word list (`hai, nahi, nhi, ka, ki, ke, se, mein, mujhe, kya, kar, raha, bahut, paisa, …`) **and** <15% are English stopwords. The list is committed and versioned, like `taxonomy_version`. New drop reason: `"non-English (romanized)"` | `normalize.py`, `tests/test_normalize.py` | ✅ + a second clause: ≥40% Hindi markers alone (see below) |
+| P2-T16 | Hinglish precision check: hand-label a 100-review sample from the real corpus (kept as a local scratch file, **not committed**, since it is third-party text) and record the precision/recall of P2-T15 here. Target: <5% of genuinely English reviews dropped. Write tests for the false positives: `"bad luck for me"`, `"ok ka"` | — | ✅ 0 English dropped in 59; ~4% residual (below) |
+| P2-T17 | Re-run stage 4 on the filtered real corpus (~1,800 reviews ≈ 45 batches; ~$0.06 extrapolated from P2-T10). Report the unclassified rate, the theme spread, and the cross-batch label disagreement from the quality caveat above. If one theme is >40% or <5%, revisit the taxonomy (bump `taxonomy_version`, do not add a sixth theme) | — | ✅ run; ⚠️ `onboarding_kyc` at 3.9% trips the <5% rule — **decision pending** (below) |
+| P2-T18 | Update the synthetic fixture (`scripts/make_fixture.py`) with rows for each new drop reason: exactly 8 words, 9 words, emoji-padded 8 words, Hinglish, and English with one Hindi word. Then regenerate `classified_golden.json` | `scripts/make_fixture.py`, `tests/fixtures/` | ✅ 270 rows; golden now covers the filtered corpus (238) |
+
+#### What the real corpus taught — §5.1 results
+
+**Filter, final numbers** (8,812 in window): 231 emoji/punctuation-only, 145 non-Latin
+script, 471 romanized Hindi, 6,257 fewer than 9 words. **1,708 kept (19.4%)**; at least 86
+in every week, 144 in 2026-W41. Ratings in the kept corpus: 1★ 705, 2★ 101, 3★ 147, 4★ 149,
+5★ 606.
+
+**P2-T16, measured rather than assumed.** Reviews were labelled by reading them (by the
+assistant during implementation, not by a second human, so treat as one rater). The samples
+stayed in scratch and were not committed.
+
+| Sample | Result |
+| --- | --- |
+| 50 reviews the first lexicon dropped | 50/50 genuinely Hindi/Hinglish: **no English review dropped** |
+| 50 reviews the first lexicon kept | 3 clearly non-English, e.g. `"do ki jyada … ke liye the"`, where `do` and `the` read as English markers |
+| 9 reviews added by the widened lexicon | all Hinglish or code-mixed (plus one gibberish string); none English |
+| 50 kept after widening | 2 non-English (~4%), both spelling `hai` as `he`, which cannot be listed because `he` is English |
+
+The fix for the 3 misses was a second clause (`HINDI_DOMINANT_RATIO = 0.4`: drop when Hindi
+markers alone reach 40%) plus ~60 more common words. Residual ~4% non-English is accepted:
+those reviews reach the classifier, which can usually label them, and closing the gap would
+start costing English reviews.
+
+**Fixture survives cleanly**: 248 in window → 238 kept, 28 in the target week. One row per
+drop reason, plus two that must survive (9 words; English borrowing `paisa`).
+
+**Golden artifact redefined.** It now covers what stage 4 actually classifies (the
+substance-filtered corpus), not the whole window. The 236 surviving labels from 2026-10-11
+are **byte-identical**; the 2 new kept rows were labelled by the same model on 2026-10-15
+(`payments_withdrawals` 0.99, `app_reliability` 0.98). The 5 labels that fell away were the
+short adapter-test rows and one 6-word title-only row.
+
+**Bug found on the first real run.** `classify_reviews` saved the cache only after the last
+batch. On 43 real batches, Groq dropped the connection after 94s (past the SDK's own
+retries) and **every completed batch was lost**, because the transport error correctly
+aborts the stage. The 7-batch fixture could never have shown this. Now `cache.save()` runs
+in `finally`, so a re-run sends only the batches still missing; pinned by
+`test_batches_finished_before_a_transport_failure_are_kept`.
+
+**P2-T17 — real classification, 2026-10-15** (`openai/gpt-oss-120b`, 1,708 reviews, 43
+batches over three attempts because Groq dropped the connection twice; the cache fix above
+meant no batch was paid for twice):
+
+| Theme | Reviews | Share | Mean ★ | 2026-W41 |
+| --- | --- | --- | --- | --- |
+| `orders_execution` | 470 | 27.5% | 3.47 | 44 |
+| `app_reliability` | 352 | 20.6% | 2.33 | 37 |
+| `charges_support` | 344 | 20.1% | 2.03 | 32 |
+| `payments_withdrawals` | 108 | 6.3% | 1.99 | 10 |
+| `onboarding_kyc` | 66 | **3.9%** | 2.05 | **3** |
+| unclassified | 368 | 21.5% | 4.01 | 18 |
+
+- **Zero** batch retries, failures, or reconciliation anomalies across all 43 batches.
+- **Unclassified 21.5% is genuine, not model failure**: mean rating 4.01, and a sample is
+  generic praise with no topic ("very nice app", "Trusted app for real ones"). The word
+  floor keeps long reviews, not on-topic ones.
+- **Cross-batch disagreement is unmeasurable here**: deduplication left no repeated text,
+  so the ~5% noise estimate from P2-T10 stands unconfirmed.
+- 144 of 1,340 labels (11%) have confidence below 0.8.
+- Tokens ~118k in / ~64k out; the ledger reports cost as unknown for this model, and the
+  P2-T10 rate extrapolates to roughly $0.06.
+
+⚠️ **Open decision — `onboarding_kyc` is below the 5% floor.** The plan's rule says revisit the
+taxonomy. Options: (a) merge it into a neighbour and split `orders_execution` (the largest,
+27.5%) into trading vs. IPO/market data — keeps five themes; (b) keep it, accepting that
+in the target week it has only 3 reviews and will essentially never rank top-3; (c) widen
+its definition (account access, login, profile changes). Any change bumps
+`taxonomy_version` and re-classifies everything. Not decided in Phase 4 because it changes
+what the note says, which is a product call.
+
+⚠️ **The filter changes what the note's numbers mean.** In the raw corpus 77% of reviews are 5★
+and 10% are 1★. After the >8-word filter, 1★ (808) *outnumbers* 5★ (698): short reviews are
+mostly "good 👍", and long reviews are mostly complaints. That is the right corpus for finding
+themes. It is the wrong corpus for describing sentiment. The note must keep disclosing
+`corpus_size of corpus_total` (already wired via `RunLedger.corpus_total`), and mean ratings in
+`ThemeStats` describe *substantive* reviews only. Say so in the rendered footer.
+
+⚠️ **Don't put a language-ID library in the pipeline to fix this.** The heuristic in P2-T15 is
+auditable, deterministic, and testable against fixed cases. A model-based detector is none of
+those, and it would make `02_normalized.json` depend on a library version. Revisit only if
+P2-T16 measures the heuristic as inadequate.
+
+```bash
+# ✅ Exit — §5.1
+pytest -q
+ruff check . && ruff format --check . && mypy src
+pulse run --dry-run --input data/raw/com-nextbillion-groww-2026-10-11.json --week 2026-W41 --from 01 --to 02
+# → ledger: corpus_total 8812, corpus_size ≈ 1,800, drop reasons for emoji / non-Latin /
+#   non-English (romanized) / "≤8 words", no week below 20
+```
 
 ---
 
@@ -466,33 +628,83 @@ At this point problemStatement.md §8 is satisfied **except** the two MCP delive
 
 ---
 
-## 7. Phase 4 — Contract, stub server, MCP client, publish
+## 7. Phase 4 — Contract, stub server, MCP client, publish ✅ COMPLETE against the stub (2026-10-15)
 
-🔗 **Requires X1 agreed** (not implemented) before starting.
+🔗 **X1 not yet signed off.** Built ahead of it on purpose: the contract file (P4-T1) *is* the
+thing to review, and the stub is where any change is cheapest to absorb. P4-T2 is the one task
+that cannot be closed from this repo.
 
 **Goal:** stages 9–10 fully working against an in-repo stub, so live integration is later a config
 change.
 
-| ID | Task | Files |
-| --- | --- | --- |
-| P4-T1 | Write `pulse-mcp/1` as JSON Schema — four tools, inputs and outputs, error-code enum | `contract/pulse-mcp-1.json` |
-| P4-T2 | Share it with the servers project; confirm it is the mirrored canonical copy (🔗 X3) | — |
-| P4-T3 | Stub MCP server: in-memory docs store, find/create/replace with real revision semantics, `create_draft`; advertises contract version in `initialize` | `tests/stubs/stub_mcp_server.py` |
-| P4-T4 | Stub fault injection: force any error code (`AUTH_REQUIRED`, `REVISION_MISMATCH`, `RATE_LIMITED`, …) via env var or tool arg | `tests/stubs/stub_mcp_server.py` |
-| P4-T5 | `ClientSession` lifecycle over stdio, with timeouts | `src/pulse/mcp/session.py` |
-| P4-T6 | Discovery: `list_tools()`, contract-version check (warn on minor, abort on major), configured-name resolution with a helpful failure listing actual names | `src/pulse/mcp/discovery.py` |
-| P4-T7 | `DocsPort` / `GmailPort` protocols + `McpDocsAdapter` / `McpGmailAdapter`. **Only file in the repo that knows a tool name** | `src/pulse/mcp/adapters.py` |
-| P4-T8 | Validate every tool response against the contract schema before use (architecture.md §18 trust boundary) | `src/pulse/mcp/adapters.py` |
-| P4-T9 | Stage 9: find-then-create/replace, title convention `Groww Review Pulse — <ISO week>`; `REVISION_MISMATCH` reports the conflict rather than overwriting | `src/pulse/publish/docs.py` |
-| P4-T10 | Stage 10: draft only, body = full note + doc link | `src/pulse/publish/gmail.py` |
-| P4-T11 | `RATE_LIMITED` honoured via `retry_after_seconds`, ≤3 attempts | `src/pulse/publish/` |
-| P4-T12 | Partial-failure handling: doc succeeded + draft failed is recorded and resumable with `--from 10` | `src/pulse/orchestrator.py` |
-| P4-T13 | `--mcp stub` / `--mcp live` switch; startup probe runs **before** any LLM call | `src/pulse/cli.py` |
-| P4-T14 | `pulse contract check` | `src/pulse/cli.py` |
-| P4-T15 | Real `doctor` MCP probes, replacing the P0 stubs | `src/pulse/cli.py` |
-| P4-T16 | `test_mcp_contract.py` — stub's advertised schemas match the contract file | `tests/test_mcp_contract.py` |
-| P4-T17 | `test_publish.py` — happy path, idempotent re-run, and each error code's handling | `tests/test_publish.py` |
-| P4-T18 | `test_mcp_discovery.py` — missing tool, version mismatch (minor and major) | `tests/test_mcp_discovery.py` |
+| ID | Task | Files | Done |
+| --- | --- | --- | --- |
+| P4-T1 | Write `pulse-mcp/1` as JSON Schema — four tools, inputs and outputs, error-code enum | `contract/pulse-mcp-1.json` | ✅ + error payload schema, version format |
+| P4-T2 | Share it with the servers project; confirm it is the mirrored canonical copy (🔗 X3) | — | ⊘ superseded — the server shipped its own interface; see §8.1 |
+| P4-T3 | Stub MCP server: in-memory docs store, find/create/replace with real revision semantics, `create_draft`; advertises contract version in `initialize` | `tests/stubs/stub_mcp_server.py` | ✅ + optional state file |
+| P4-T4 | Stub fault injection: force any error code (`AUTH_REQUIRED`, `REVISION_MISMATCH`, `RATE_LIMITED`, …) via env var or tool arg | `tests/stubs/stub_mcp_server.py` | ✅ env only (`PULSE_STUB_FAULTS`); a tool arg would violate the contract's `additionalProperties: false` |
+| P4-T5 | `ClientSession` lifecycle over stdio, with timeouts | `src/pulse/mcp/session.py` | ✅ |
+| P4-T6 | Discovery: `list_tools()`, contract-version check (warn on minor, abort on major), configured-name resolution with a helpful failure listing actual names | `src/pulse/mcp/discovery.py` | ✅ + pagination |
+| P4-T7 | `DocsPort` / `GmailPort` protocols + `McpDocsAdapter` / `McpGmailAdapter`. **Only file in the repo that knows a tool name** | `src/pulse/mcp/adapters.py` | ✅ ports in `publish/ports.py` |
+| P4-T8 | Validate every tool response against the contract schema before use (architecture.md §18 trust boundary) | `src/pulse/mcp/adapters.py` | ✅ outputs, errors, and our own inputs |
+| P4-T9 | Stage 9: find-then-create/replace, title convention `Groww Review Pulse — <ISO week>`; `REVISION_MISMATCH` reports the conflict rather than overwriting | `src/pulse/publish/docs.py` | ✅ |
+| P4-T10 | Stage 10: draft only, body = full note + doc link | `src/pulse/publish/gmail.py` | ✅ |
+| P4-T11 | `RATE_LIMITED` honoured via `retry_after_seconds`, ≤3 attempts | `src/pulse/publish/` | ✅ `retry.py`; 2s×attempt without a hint, capped at 60s |
+| P4-T12 | Partial-failure handling: doc succeeded + draft failed is recorded and resumable with `--from 10` | `src/pulse/orchestrator.py` | ✅ ledger `partial`; CLI prints the exact resume command |
+| P4-T13 | `--mcp stub` / `--mcp live` switch; startup probe runs **before** any LLM call | `src/pulse/cli.py` | ✅ probe in `pipeline.preflight`, before stage 1 |
+| P4-T14 | `pulse contract check` | `src/pulse/cli.py` | ✅ |
+| P4-T15 | Real `doctor` MCP probes, replacing the P0 stubs | `src/pulse/cli.py` | ✅ in `doctor.py` |
+| P4-T16 | `test_mcp_contract.py` — stub's advertised schemas match the contract file | `tests/test_mcp_contract.py` | ✅ 15 tests |
+| P4-T17 | `test_publish.py` — happy path, idempotent re-run, and each error code's handling | `tests/test_publish.py` | ✅ 23 tests, 8 through the real stub |
+| P4-T18 | `test_mcp_discovery.py` — missing tool, version mismatch (minor and major) | `tests/test_mcp_discovery.py` | ✅ 19 tests |
+
+### What landed beyond the task list — Phase 4
+
+| Addition | Why |
+| --- | --- |
+| `mcp/contract.py` | One loader for the contract file, used by the client, the stub, and `contract check`, so the three cannot disagree about it. |
+| Stub state file (`PULSE_STUB_STATE`) | Each stage spawns its own server process, so purely in-memory state could never show the exit criterion's "same doc URL on a second run". Set in `[stub] env` in `config/mcp.toml`. |
+| `python` in `mcp.toml` means `sys.executable` | Otherwise the stub runs under whatever Python is first on PATH, cannot import `pulse`, and fails as a bare "connection closed". |
+| Stderr tail in "server won't start" errors | The servers project not being installed shows up as `No module named pulse_mcp_servers` in the message, rather than "connection closed". |
+| Stage 9 re-scans `pulse.md` for PII | It is a file on disk between stages 8 and 9 and can be edited; publishing re-checks the exact bytes it sends. |
+| `09_published.json`, `10_draft.json` | `--from 10` needs the published URL, and the run directory should show what was published without opening the ledger. |
+| `mcp>=2.3,<3`, explicit `jsonschema` | The code targets the 2.x SDK (snake_case fields, handler-based server); `mcp>=1.2` would have admitted an incompatible install. |
+
+### Bugs this phase found
+
+| Bug | Impact if shipped |
+| --- | --- |
+| **SDK errors arrive as nested `ExceptionGroup`s** — including the caller's own exceptions | Every MCP failure would have surfaced as an unreadable group-of-groups traceback, and the pipeline's `except McpClientError` would never match. `session.py` unwraps to the real error; a test raises inside a session and asserts it arrives intact. |
+| **The PII digit backstop redacted ISO dates.** `\d[\d\s\-]{7,}\d` counted *characters*, so `2026-10-01` (8 digits) matched | Caught when a note rendered with a date failed its own pre-publish scan. The same rule would have redacted "stuck since 2026-10-01" in review text, degrading quotes. Now counts ≥9 digits; pinned in the scrub negative table. |
+
+### Contract findings — for the X1 review
+
+1. **Gmail authorization cannot be probed.** `list_tools()` works without credentials by
+   contract, and Gmail's only tool creates a draft. So an unauthorized Gmail server is found
+   at stage 10, *after* LLM spend — exactly what §11.6 set out to prevent. Docs is probed with
+   the read-only `find_document`. Proposal for `pulse-mcp/1.1`: a read-only
+   `gmail.auth_status`, or `AUTH_REQUIRED` surfaced at `initialize`.
+2. **Version location and error shape were unspecified** in §11.2's prose. The contract file
+   now fixes both (`serverInfo.version = "pulse-mcp/1.0"`; error object in
+   `structuredContent`). The servers project should confirm.
+3. **Drafts are not idempotent.** Re-running a week creates a second draft (seen in the exit
+   run: `draft-0002`, then `draft-0003`). Docs are idempotent by title; Gmail has no
+   find-draft tool. Acceptable for a weekly job; a `gmail.find_draft` would close it if needed.
+4. **X4 is handled without a decision:** `find_document` may return `revision: null`, and
+   the agent then sends `if_revision: null`, which is last-write-wins by contract.
+
+```bash
+# ✅ Exit — all verified 2026-10-15
+pytest -q                                   # 729 passed (incl. 57 Phase 4 tests)
+ruff check . && ruff format --check . && mypy src
+pulse contract check                        # OK stub; SKIP docs/gmail (live) — not built yet
+pulse run --mcp stub --input tests/fixtures/reviews_sample.json --week 2026-W41
+#   → Document: https://docs.stub.invalid/d/doc-0001   Gmail draft: draft-0002 (not sent)
+pulse run --mcp stub --input tests/fixtures/reviews_sample.json --week 2026-W41
+#   → Document: https://docs.stub.invalid/d/doc-0001   (same URL; stub holds 1 doc, revision 2)
+```
+
+Both runs set `PULSE_RECIPIENT`; without it the preflight aborts before stage 1, as it should.
 
 ### Implementation notes — Phase 4
 
@@ -521,34 +733,155 @@ pulse run --mcp stub --input tests/fixtures/reviews_sample.json   # same doc URL
 
 ---
 
-## 8. Phase 5 — Live integration
+## 8. Phase 5 — Live integration against `google-workspace-mcp` 🔄 built against the stub; live run pending (2026-10-16)
 
-🔗 **Blocked on the servers project.** The only phase that is.
+**Unblocked:** the servers project exists and is deployed.
 
-**Goal:** a real Google Doc and a real Gmail draft.
+| | |
+| --- | --- |
+| Endpoint | `https://mail-docs-mcp-server-production.up.railway.app/mcp` |
+| Source | [vikramragu/Mail-Docs-MCP-Server](https://github.com/vikramragu/Mail-Docs-MCP-Server), read at commit `75adcf6` |
 
-| ID | Task | Files |
+**Goal (unchanged):** a real Google Doc and a real Gmail draft.
+
+**What changed:** the deployed server does **not** implement `pulse-mcp/1`. It is a general-purpose
+Google Workspace server with its own interface. Below, everything was read from the server's
+README and source; none of it has been checked against the live endpoint yet (P5-T1 does that).
+
+### 8.1 Gap analysis — `pulse-mcp/1` (what P4 built against) vs. the deployed server
+
+| Area | `pulse-mcp/1` (our contract and stub) | Deployed server | Impact on the agent |
+| --- | --- | --- | --- |
+| **Transport** | stdio subprocess | Streamable HTTP, **stateless**, `POST /mcp`; `GET /healthz` unauthenticated | `session.py` needs an HTTP transport (X2 resolved: remote HTTP) |
+| **Auth to the server** | none (local process) | `Authorization: Bearer <MCP_AUTH_TOKEN>` | Token from env (`PULSE_MCP_TOKEN`), never in config or the repo |
+| **Servers** | two (docs, gmail) | **one** server, both tool groups (X5 resolved) | One `[live]` entry instead of `[docs]` and `[gmail]` |
+| **Version** | `serverInfo.version = "pulse-mcp/1.0"` | `serverInfo = {name: "google-workspace-mcp", version: "0.1.0"}` | Current discovery **aborts** ("not a contract version"). Must check name + semver instead. |
+| **Tool names** | `docs.find_document`, … | `ping`, `docs_get_info`, `docs_append_content`, `gmail_create_draft`, `gmail_send_email` | Names are config-driven, but the *semantics* differ (next rows) |
+| **Find doc by title** | `find_document(title)` | ✗ none. `docs_get_info(document)` takes an ID or URL; returns title, tabs, URL | Agent can't discover the doc; **the doc ID must be configured** |
+| **Create doc** | `create_document` | ✗ none (a stated non-goal: "no auto-create") | The doc is **created once by hand** and shared with the authorized account |
+| **Replace body** | `replace_document_body(if_revision)` | ✗ none. `docs_append_content(document, blocks[], tab_id?, add_separator)` only appends | **Publishing model changes:** one standing doc, a new section per week (see 8.2) |
+| **Content format** | CommonMark string | `blocks[]`: `paragraph`, `heading1`-`3`, `bullet`, `numbered`; whole-block `bold` only; ≤200 blocks, ≤10k chars each | New **blocks renderer**. Block quotes, inline bold/italic and links have no equivalent. Quotes must still be verbatim. |
+| **Revision conflicts** | `REVISION_MISMATCH` to the agent | Handled inside the server (`writeControl` + one retry) | Agent-side conflict handling becomes unreachable; keep the code, drop it from the live path |
+| **Gmail draft** | `to: str, body_text, body_html` → `{draft_id, thread_id}` | `to: str[], subject, body, body_format: text\|html, cc, bcc, …` → `{status, draft_id?, message_id?, to[]}` | Adapter argument and result mapping |
+| **Send tool** | deliberately absent | **`gmail_send_email` present**; `ENABLE_GMAIL_SEND=true` on the live deployment | The agent must never bind it. Ask for it to be disabled for this agent (8.3, D-1) |
+| **Errors** | `structuredContent.code`, one of 6 codes | **Prose only:** `isError: true` + text, no `code`, no `structuredContent` | Current adapter rejects every error as a protocol violation. Needs a message → code map. |
+| **Rate limits** | `RATE_LIMITED` + `retry_after_seconds` | Server retries 429/5xx itself (3×), then "Google API temporarily unavailable." | Agent's retry layer rarely fires. Map that message to `UPSTREAM_ERROR`. |
+| **Auth probe** | `find_document` (Docs only) | `docs_get_info(<configured doc>)` is read-only, and **one OAuth token covers both APIs** | Better than P4: probing Docs also proves the shared token. Only a missing Gmail *scope* stays unprobeable. |
+| **Dry run** | — | `DRY_RUN=false` live: real writes | First live run goes to a **scratch doc** (P5-T8) |
+
+**X1 is superseded rather than signed off.** The servers project defined its own interface, and
+its README lists create/replace as non-goals. The two ways forward:
+
+- **A. Adapt the agent to the server** — **recommended, and planned below.** The server is
+  deliberately client-agnostic and already tested and deployed. Every change on our side lands
+  in the modules built to absorb it: `mcp/`, `publish/`, `render.py`, config.
+- **B. Add `pulse-mcp/1` tools to the server** (`find_document`, `create_document`,
+  `replace_document_body`, structured error codes). That reopens the server's non-goals, and
+  the server team carries the work. Choose B only if per-week documents are a hard requirement.
+
+### 8.2 Publishing model under option A
+
+- **One standing doc**, e.g. "Groww Review Pulse". It is created by hand and its ID is set as
+  `[docs] document_id` (or `PULSE_DOC_ID`).
+- Each week's note is **appended as a section**: a `heading1` reading
+  `Groww Review Pulse — <ISO week>`, then the note's blocks.
+- **Idempotency moves to the agent's own record.** The server can't read the doc body, so the
+  agent can't check whether a week's section already exists. Before appending, stage 9 checks a
+  local publish record keyed by `(document_id, iso_week)`, built from previous runs'
+  `09_published.json`. If the week is already there, it skips with a message.
+  `--republish` appends a second, marked section deliberately.
+  This is weaker than P4's find-by-title: it is local state, so a clean checkout forgets it.
+  Recorded as a risk.
+- The doc URL in the draft points at the standing doc, plus the week's tab or heading where
+  possible.
+
+### 8.3 Decisions needed before or at the start of Phase 5
+
+| # | Decision | Recommendation |
 | --- | --- | --- |
-| P5-T1 | Resolve X2 (how the servers are distributed) and point `config/mcp.toml` at them | `config/mcp.toml` |
-| P5-T2 | Set `PULSE_RECIPIENT` (🔗 O3) and `folder_id` if used (🔗 O4) | env, `config/pulse.toml` |
-| P5-T3 | `pulse doctor` against live servers; drive the authorization path end to end | — |
-| P5-T4 | Full live run; verify the doc renders correctly and the draft contains note + link | — |
-| P5-T5 | Re-run and confirm in-place update, same URL | — |
-| P5-T6 | Run the P4 contract tests against the **live** servers (the one cross-project test row) | `tests/test_mcp_contract.py` |
-| P5-T7 | Record any contract deviations found; fix in whichever project is wrong, bump version if the contract itself changes | `contract/`, architecture.md §11.2 |
+| D-1 | `gmail_send_email` is live and enabled on a public URL | **Decided 2026-10-15: `ENABLE_GMAIL_SEND=false` for now; revisit later.** Set in Railway by the owner. The agent only needs `ENABLE_GMAIL_DRAFTS` and `ENABLE_DOCS_APPEND`, and also refuses to bind any `send` tool (P5-T6). If the agent should later *send* rather than draft, that is a requirements change: the problem statement asks for a draft. It would need a deliberate decision and a change to the P5-T6 guard, not just flipping this switch. |
+| D-2 | Option A (adapt agent) vs B (extend server) | **Decided 2026-10-16: A.** Implemented in 8.4. |
+| D-3 | Standing doc vs per-week docs | **Standing doc** (follows from A) |
+| D-4 | Which Google account and doc | Create the doc in the account the server's OAuth token belongs to, and record its ID |
+| D-5 | `ALLOWED_RECIPIENT_DOMAINS` on the server | Set it to the pulse recipient's domain, so a misconfigured agent can't draft to anyone |
 
-⚠️ **Expect the first live run to find at least one contract gap.** Markdown fidelity and error
-shapes are the usual suspects. That's the stub's job done correctly — it moved the discovery from
-"mysterious production failure" to "a test disagrees with a schema."
+### 8.4 Tasks
 
-⚠️ **Verify the draft was not sent.** Check the Gmail Drafts folder, not Sent. There is no send tool
-in the contract, so this should be structurally impossible — confirm it anyway, once.
+| ID | Task | Files | Done |
+| --- | --- | --- | --- |
+| P5-T1 | **HTTP transport + live smoke test.** Streamable HTTP in `session.py`, selected by `transport = "http"` + `url` in `config/mcp.toml`. Bearer token from `PULSE_MCP_TOKEN` (env / `.env` only). Then `ping` and `list_tools()` against the live URL, saving the advertised schemas for P5-T2 | `src/pulse/mcp/session.py`, `config/mcp.toml`, `config.py` | ✅ code; ☐ live smoke test waits on `PULSE_MCP_TOKEN` |
+| P5-T2 | **Contract for the real server.** `contract/google-workspace-mcp-0.1.json` holds the three tools the agent uses (`docs_get_info`, `docs_append_content`, `gmail_create_draft`) exactly as served. Discovery checks `serverInfo.name` plus semver (0.x: a minor change counts as breaking). Retire `pulse-mcp-1.json`, keeping it in git history | `contract/`, `mcp/contract.py`, `mcp/discovery.py` | ✅ consumer-driven (below); `pulse-mcp-1.json` moved to `contract/archive/` (it was never committed) |
+| P5-T3 | **Rewrite the stub to the real server's surface**: same tool names, schemas, prose-only errors, and `DRY_RUN`-style behaviour. Every Phase 4 test keeps exercising the interface that actually exists | `tests/stubs/stub_mcp_server.py` | ✅ + HTTP mode with bearer auth |
+| P5-T4 | **Ports and adapters.** `DocsPort`: `get_info(document)`, `append(document, blocks)`. `GmailPort`: `create_draft(to, subject, body, body_format)`. Error **message → code map** (auth / not found / no access / unavailable / allowlist / feature disabled / validation). An unrecognised message maps to `UPSTREAM_ERROR` with the text preserved | `publish/ports.py`, `mcp/adapters.py` | ✅ |
+| P5-T5 | **Blocks renderer** from `PulseNote`: heading → `heading1`/`2`, themes and actions → `bullet`, quotes → `paragraph` holding the exact quote text in quotation marks, headline → bold paragraph. Tests: quote text survives byte-for-byte; no markdown syntax leaks; the block count and text sizes stay within server limits; the word count matches `pulse.md` | `rendering/render.py`, `tests/test_render.py` | ✅ |
+| P5-T6 | **Stage 9/10 rework.** Stage 9 runs get-info then append under the week heading, with the publish-record idempotency from 8.2 and `--republish`. Stage 10 calls `gmail_create_draft` with `to=[recipient]`, `body_format="text"`. **Never bind `gmail_send_email`**: binding refuses any tool with `send` in its name, and `contract check` warns if one is advertised | `publish/docs.py`, `publish/gmail.py`, `pipeline.py`, `cli.py` | ✅ + stage 10 skips a draft the week already has |
+| P5-T7 | **Preflight for the real server:** `ping`, then `docs_get_info(configured doc)`. This proves the token, the doc's existence and access, and Docs auth before any LLM spend. Missing config (`PULSE_MCP_TOKEN`, doc ID, recipient) aborts with what to set | `pipeline.py`, `doctor.py` | ✅ (`ping` not needed: `initialize` proves reachability) |
+| P5-T8 | **First live run against a scratch doc** (`PULSE_DOC_ID` = a throwaway doc), because the server's `DRY_RUN` is off. Check the doc's formatting by eye and that the draft is in **Drafts, not Sent** | — | ☐ needs token + scratch doc ID |
+| P5-T9 | **Real run** against the standing doc. Then re-run the same week: confirm no duplicate section, and record the second draft (drafts are still not idempotent) | — | ☐ needs token + standing doc ID |
+| P5-T10 | **Contract tests against live:** `pulse contract check` compares the live `list_tools()` with `contract/google-workspace-mcp-0.1.json`; record any drift | `tests/test_mcp_contract.py` (opt-in live marker) | ◐ `pulse contract check` covers live; run it once the token is set |
+| P5-T11 | **Docs:** rewrite architecture.md §11 (contract, publishing semantics, auth), §15 failure modes, X1–X5 outcomes; record the deviations here | `docs/architecture.md` | ◐ architecture.md §11 updated; §15 pending |
+
+⚠️ **Quotes stay verbatim through the block conversion.** Stage 7 proves quotes are exact
+substrings of reviews in `pulse.md`. The blocks renderer is a second render path, so P5-T5 must
+prove the same quote bytes reach the doc. Otherwise the guarantee holds for the file and not
+for the published artifact.
+
+⚠️ **Live writes are real** (`DRY_RUN=false`). Use a scratch doc, and `ALLOWED_RECIPIENT_DOMAINS`
+if possible, until P5-T8 has passed by eye.
+
+⚠️ **Verify the draft was not sent.** Check the Drafts folder, not Sent. Unlike under
+`pulse-mcp/1`, a send tool now *exists* on the server, so this is no longer structurally
+impossible. That is why D-1 and the P5-T6 guard matter.
+
+### 8.5 Results so far (2026-10-16)
+
+Option A is built and green against the rewritten stub, over **both** stdio and HTTP with
+bearer auth. The live server has only been checked at `/healthz` (200), because no token is
+configured yet. Everything below runs offline.
+
+| Measure | Result |
+| --- | --- |
+| Test suite | **771 passed**; ruff and mypy clean |
+| Contract check | `OK stub` (3 tools accept our requests and declare the fields we read); `SKIP live` (no `PULSE_MCP_TOKEN`) |
+| `pulse doctor` | `OK mcp-stub`; `WARN mcp-live` (no token); `WARN mcp-doc` (no `PULSE_DOC_ID`) |
+| CLI stages 9-10 vs stub, replayed 3× into one run | 1 section appended, 1 draft, **0 sends**; runs 2-3 report `skipped` |
+
+**The contract is consumer-driven, not a copy of the server's schemas.** The server owns its
+schemas and may add optional fields without telling us. `contract/google-workspace-mcp-0.1.json`
+records only what the agent relies on:
+
+- an example request per tool, which must validate against the server's *advertised* input
+  schema (draft-07 aware);
+- the response fields the agent reads, which must stay declared in its output schema;
+- the server's name and semver;
+- the ordered message → error-code rules.
+
+`pulse contract check` asserts all of these against the stub and the live server.
+
+#### Bugs this phase found
+
+| Bug | Impact if shipped |
+| --- | --- |
+| **`record_stage(..., **detail)` crashed when a stage's detail contained `status`** | Every stage 9/10 completion would have raised `TypeError` inside the ledger. Detail is now passed as a dict. |
+| **Replaying into the run that published overwrote its `appended` record with `skipped`** | The only evidence a week was in the doc was erased, so the *next* replay appended it again. Skips never overwrite a real record now; pinned by `test_replaying_into_the_same_run_never_erases_the_record`. |
+| **The SDK reports HTTP 401 as a generic "Server returned an error response"** | A wrong `PULSE_MCP_TOKEN` would have read as "server could not be reached". The session records 401/403 itself, so the error names the token. |
+| **Stage 8 rendered `pulse.md` without `corpus_total`** | The "N substantive reviews of M in window" disclosure required by §5.1 never reached the published note. Fixed in both renderers. |
+| **The Phase 4 stub's state file crashed the Phase 5 stub** | A stale `.cache/stub-mcp-state.json` made `--mcp stub` fail as "exited during startup". The state file is versioned; an old one is ignored. |
+
+**Waiting on the owner before P5-T8:**
+
+- `PULSE_MCP_TOKEN` in `.env`;
+- the scratch and standing doc IDs (D-4);
+- `PULSE_RECIPIENT`;
+- `ENABLE_GMAIL_SEND=false` on Railway (D-1).
 
 ```bash
 # ✅ Exit
-pulse doctor                     # both live servers reachable, contract OK
-pulse run                        # real doc URL + real draft id in the ledger
-pulse run                        # same doc URL
+pulse doctor                         # live server reachable, token OK, doc accessible
+pulse contract check                 # live tools match contract/google-workspace-mcp-0.1.json
+pulse run --mcp live                 # week section appended to the standing doc; draft id in ledger
+pulse run --mcp live                 # same week: skipped, no duplicate section
+pytest -q                            # offline, against the rewritten stub
 ```
 
 ---
@@ -607,15 +940,19 @@ Every line of problemStatement.md §8, mapped to where it gets satisfied and wha
 
 | Risk | Likelihood | Impact | Mitigation |
 | --- | --- | --- | --- |
-| **O1 never resolves** — no compliant public Play export is found | Medium | High — the pipeline has no real input | The canonical-format + synthetic-fixture approach means everything downstream is built and tested regardless. Escalate early: this is a sourcing question, not an engineering one, and it is the project's one unsolved premise. |
+| ~~**O1 never resolves**~~ — no compliant public Play export is found | **Retired 2026-10-12** | — | Resolved by `pulse fetch`, outside the pipeline so the analysis stays file-driven. **The residual risk is not technical:** the fetch reads Google's undocumented endpoints, which sits in tension with §6's "no ToS-violating automation". Accepted knowingly for a learning project and documented in architecture.md O1; a licensed provider is the swap for anything commercial, and costs one new module. A second caveat: `lang=en` makes the corpus an English-speaking subset, not a representative sample. |
 | **X1 stalls** — contract not agreed by Phase 4 | Medium | Medium | Send §11.2 for review on day 1. P4 has four phases of lead time; nothing else depends on it. |
 | Servers project late | Medium | Low | Only P5 blocks. P6 can run before P5. |
 | Model won't produce verbatim quotes reliably | **High** | Medium | Expected, not exceptional. Candidate pool + substring check + feedback loop; if 3 attempts prove insufficient in practice, narrow the pool and sharpen the prompt rather than loosening the check. |
 | Prompt cache silently missing | Medium | Medium (cost) | Assert `cache_read_input_tokens > 0` in P2; surface the rate in every run summary. |
 | Scrubber over-redacts, degrading quotes | Medium | Medium | Negative test table (P1-T10); candidate filter drops placeholder-containing reviews. |
 | Thin target week produces a meaningless note | Low | Low | < 20 reviews aborts (P3-T5). |
-| Theme taxonomy doesn't fit the real corpus | Medium | Medium | Visible at P2 on real data. Change enum members and bump `taxonomy_version`; do not add a sixth theme. |
-| Contract gaps found only at P5 | **High** | Low | By design — the stub converts these into schema disagreements instead of production failures. |
+| Theme taxonomy doesn't fit the real corpus | Medium | Medium | Visible at P2 on real data (P2-T17). Change enum members and bump `taxonomy_version`; do not add a sixth theme. |
+| Substance filter misread as population sample | **High** | Medium | Measured 2026-10-15: the >8-word English subset is 22% of the window and is complaint-skewed (1★ > 5★, versus 77% 5★ raw). The note discloses `corpus_size of corpus_total`, and ratings are labelled as describing substantive reviews (§5.1). |
+| Hinglish heuristic drops real English | Medium | Low | Precision measured on a hand-labelled sample (P2-T16), with false-positive cases pinned as tests. |
+| Contract gaps found only at P5 | **Happened** (2026-10-15) | Medium | Larger than expected: the server has a different interface altogether, not small schema drift (§8.1). Contained as designed: the analysis half is untouched, and the changes land in `mcp/`, `publish/` and the renderer. P5 grew from ~1 day to 2–3. |
+| A send tool is reachable from the agent's server | Medium | **High** | `gmail_send_email` is enabled on the live deployment. Disable it for this agent (D-1), and have the agent refuse to bind any `send` tool (P5-T6). |
+| Week idempotency lives in local state | Medium | Low | The server can't read doc bodies, so a clean checkout forgets which weeks were published, and a re-run duplicates a section. The publish record makes it visible; `--republish` makes duplication deliberate. |
 
 The two rows worth re-reading are the first and the fourth. The first is the only risk that can
 make the project undeliverable, and it is not something code can fix. The fourth is near-certain but
