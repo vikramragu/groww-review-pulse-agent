@@ -293,6 +293,10 @@ def stage_draft(context: RunContext, options: PipelineOptions, detail: dict[str,
         # Every attempt's failures are persisted before the abort, so a developer can see
         # what the model actually got wrong rather than guessing from a log line.
         context.write_artifact(7, {"status": "aborted", "reason": str(exc)})
+        # A replay that fails must not leave the previous draft behind: stages 9-10 read
+        # these files, so a later `--from 9` would publish a note this run just rejected.
+        context.artifact_path(6).unlink(missing_ok=True)
+        context.note_path.unlink(missing_ok=True)
         raise PipelineError(str(exc)) from exc
 
     context.write_artifact(6, outcome.note)

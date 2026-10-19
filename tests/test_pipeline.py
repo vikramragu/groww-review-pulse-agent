@@ -15,7 +15,7 @@ import pytest
 from pulse.analysis.scrub import has_pii
 from pulse.config import Settings, load_settings
 from pulse.llm import FakeLlm, LlmNotConfigured, NullLlm
-from pulse.models import ClassifiedReview, RawReview, Review, Theme
+from pulse.models import ClassifiedReview, RawReview, Review, Theme, ThemeStats
 from pulse.orchestrator import RunContext, start_run
 from pulse.pipeline import (
     PipelineError,
@@ -472,3 +472,34 @@ def test_stage_four_without_a_provider_fails_before_writing_an_artifact(
         )
 
     assert context.completed_stages() == [1, 2, 3]
+
+
+# --------------------------------------------------------------------------------------
+# Stage 6 — a failed re-draft leaves nothing publishable behind
+# --------------------------------------------------------------------------------------
+
+
+def test_a_failed_redraft_removes_the_previous_note(settings: Settings, tmp_path: Path) -> None:
+    """Replaying `--from 5` into a run that already has a note, and failing, must not leave
+    that older note for a later `--from 9` to publish."""
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    context.write_artifact(3, [])
+    stats = ThemeStats(
+        theme=Theme.APP_RELIABILITY,
+        review_count=10,
+        share_of_week=0.2,
+        mean_rating=2.0,
+        delta_vs_baseline=0.0,
+        quote_candidates=[],
+    )
+    context.write_artifact(5, {"selected": [stats.model_dump(mode="json")] * 3})
+    context.write_artifact(6, {"stale": True})
+    context.write_note("# an older, superseded note\n")
+
+    llm = FakeLlm(responses=["not json"] * settings.pulse.draft.max_attempts)
+    with pytest.raises(PipelineError, match="No compliant note"):
+        run_stages(context, options(settings, tmp_path, from_stage=6, to_stage=6, llm=llm))
+
+    assert not context.artifact_path(6).exists()
+    assert not context.note_path.exists()
+    assert context.read_artifact(7)["status"] == "aborted"
