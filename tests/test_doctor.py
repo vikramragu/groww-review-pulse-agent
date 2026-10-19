@@ -308,6 +308,10 @@ def test_mcp_probes_contact_the_servers(monkeypatch: pytest.MonkeyPatch) -> None
     fill (WARN) rather than a fault -- like PULSE_RECIPIENT."""
     monkeypatch.setenv("PULSE_CONFIG_DIR", "config")
     _, settings = check_config()
+    # The repo config names the standing doc; this test is about the unconfigured case.
+    pulse = settings.pulse
+    no_doc = pulse.model_copy(update={"docs": pulse.docs.model_copy(update={"document_id": ""})})
+    settings = settings.model_copy(update={"pulse": no_doc})
 
     results = {result.name: result for result in check_mcp_servers(settings)}
 

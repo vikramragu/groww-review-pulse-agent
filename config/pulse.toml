@@ -92,4 +92,4 @@ title_template = "Groww Review Pulse — {week}"
 # The standing Google Doc every week is appended to (implementation-plan.md §8.2). The MCP
 # server cannot create or find documents, so create it once by hand in the account the
 # server is authorized as. Not a secret; PULSE_DOC_ID overrides it (e.g. for a scratch doc).
-document_id = ""
+document_id = "1z2tsdsQ0BkiDA3nPC4xN2AGaZLs80YdAxrK7Lfj9bJ0"
