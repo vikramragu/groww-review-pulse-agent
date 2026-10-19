@@ -60,7 +60,10 @@ src/pulse/
 ├── analysis/         # scrub (PII), classify, aggregate, draft
 ├── rendering/        # render (markdown + blocks), validate (the gate)
 ├── publish/          # ports (DocsPort/GmailPort), docs (stage 9), gmail (stage 10), retry
-└── mcp/              # contract, session (stdio + HTTP), discovery, adapters, errors
+├── mcp/              # THE MCP CLIENT: session (HTTP + token), discovery (tools/list), adapters
+└── ui/data.py        # dashboard data: load a run, re-check it, export/verify a snapshot
+frontend/streamlit_app.py                # THE FRONT END (D11): local + public dashboard
+snapshots/<week>.json                    # the public dashboard's verified data
 contract/google-workspace-mcp-0.1.json   # what the agent sends to / reads from the server
 contract/archive/pulse-mcp-1.json        # superseded original contract (kept for reference)
 tests/stubs/stub_mcp_server.py           # stand-in for the real server (stdio + HTTP)
@@ -84,7 +87,7 @@ config/{pulse,themes,mcp}.toml
 | P3 Aggregate → draft → validate → render | ✅ complete, and run on the real reviews 2026-10-19 |
 | P4 Contract, stub, MCP client, publish | ✅ complete against the original `pulse-mcp/1` stub, then superseded by P5 |
 | P5 Live integration | ✅ **complete** 2026-10-19: published to the scratch and standing docs, drafts created, re-run adds nothing; architecture.md §15 rewritten |
-| Dashboard (D11) | ✅ 2026-10-19: `streamlit_app.py`, local (all runs, actions behind a confirmation) and public (verified `snapshots/<week>.json`). Deploy on Streamlit Community Cloud |
+| Dashboard (D11) | ✅ 2026-10-19: `frontend/streamlit_app.py`, local (all runs, actions behind a confirmation) and public (verified `snapshots/<week>.json`). Deploy on Streamlit Community Cloud |
 | P6 Hardening | 🔄 T1–T8 done 2026-10-19 (no-Google-SDK test, golden end-to-end test, ledger usage fix, cost line, README, runbook, retention, acceptance walk). T9 sample pulse awaits a decision |
 
 **Verification as of 2026-10-19:**
@@ -232,7 +235,7 @@ Stub state persists in `.cache/stub-mcp-state.json`; delete it to start from an 
 
 ## Next steps, in order
 
-0. **Deploy the dashboard** on Streamlit Community Cloud (repo `main`, `streamlit_app.py`).
+0. **Deploy the dashboard** on Streamlit Community Cloud (repo `main`, main file `frontend/streamlit_app.py`).
    After each published week: `pulse snapshot`, commit, push.
 1. **P6-T9 sample pulse:** largely answered by the public snapshot (D11), which shows the real note; decide whether to commit the real 2026-W41 note (three short
    public quotes, scrubbed) as `docs/sample-pulse.md`, or point at the synthetic golden note.

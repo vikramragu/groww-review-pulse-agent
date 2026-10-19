@@ -885,77 +885,44 @@ login` profile, so a bare `anthropic.Anthropic()` is correct — no key handling
 
 ## 13. Directory Layout
 
+As built (2026-10-19).
+
 ```text
-agent-mcp/
-├── docs/
-│   ├── problemStatement.txt
-│   ├── problemStatement.md
-│   └── architecture.md
-├── config/
-│   ├── pulse.toml
-│   ├── themes.toml
-│   └── mcp.toml
-├── contract/
-│   └── pulse-mcp-1.json          # tool schemas; mirrored into the servers project
-├── data/
-│   └── raw/                      # public export drop (gitignored)
-├── runs/                         # per-run artifacts (gitignored)
-│   └── 2026-W41-01/
-│       ├── 01_raw.json
-│       ├── 02_normalized.json
-│       ├── 03_scrubbed.json
-│       ├── 04_classified.json
-│       ├── 05_stats.json
-│       ├── 06_note.json
-│       ├── 07_validation.json
-│       ├── pulse.md
-│       ├── 09_published.json     # document id, URL, revision, created|replaced
-│       ├── 10_draft.json         # draft id, subject, doc URL it points at
-│       └── run.json              # ledger: timings, token usage, doc URL, draft id
-├── src/pulse/
-│   ├── __init__.py
-│   ├── cli.py
-│   ├── orchestrator.py
-│   ├── models.py
-│   ├── config.py
-│   ├── llm.py                    # Anthropic client, caching, retry
-│   ├── ingest/
-│   │   ├── base.py               # ReviewSource protocol
-│   │   ├── file_drop.py
-│   │   └── normalize.py
-│   ├── analysis/
-│   │   ├── scrub.py
-│   │   ├── classify.py
-│   │   ├── aggregate.py
-│   │   └── draft.py
-│   ├── rendering/
-│   │   ├── render.py
-│   │   └── validate.py
-│   ├── publish/
-│   │   ├── ports.py               # DocsPort / GmailPort — all stages 9-10 depend on
-│   │   ├── docs.py                # find-then-create/replace, conflict handling
-│   │   ├── gmail.py
-│   │   └── retry.py               # RATE_LIMITED, honouring retry_after_seconds
-│   └── mcp/
-│       ├── contract.py            # loads contract/pulse-mcp-1.json; versions, error codes
-│       ├── errors.py
-│       ├── session.py             # ClientSession lifecycle, stdio transport
-│       ├── discovery.py           # list_tools, contract-version check, binding, drift
-│       └── adapters.py            # McpDocsAdapter / McpGmailAdapter (only tool-name knowledge)
-├── tests/
-│   ├── fixtures/reviews_sample.json
-│   ├── stubs/stub_mcp_server.py  # implements pulse-mcp/1 in memory
-│   ├── test_scrub.py
-│   ├── test_aggregate.py
-│   ├── test_validate.py
-│   ├── test_render.py
-│   ├── test_mcp_discovery.py
-│   ├── test_mcp_contract.py      # stub conforms to contract/pulse-mcp-1.json
-│   ├── test_publish.py           # stages 9–10 against the stub
-│   └── test_no_google_sdk.py     # MCP-first / boundary dependency guard
-├── pyproject.toml
-└── README.md
+groww-review-pulse-agent/
+├── frontend/                       # THE FRONT END (D11): layout only
+│   ├── streamlit_app.py            # tabs, charts, buttons; buttons call the `pulse` CLI
+│   └── README.md
+├── src/pulse/                      # THE AGENT
+│   ├── cli.py                      # pulse run | fetch | doctor | contract check | snapshot | …
+│   ├── __main__.py                 # `python -m pulse` (what the dashboard's buttons run)
+│   ├── pipeline.py                 # the ten stages + preflight
+│   ├── orchestrator.py             # run dirs, artifacts, ledger
+│   ├── config.py · models.py · llm.py · doctor.py · logging.py
+│   ├── ingest/                     # stages 1-2: file_drop, normalize, play_store (`pulse fetch`)
+│   ├── analysis/                   # stages 3-6: scrub, classify, aggregate, draft
+│   ├── prompts/                    # the two LLM prompts: taxonomy (classify), draft
+│   ├── rendering/                  # stages 7-8: validate (the gate), render (markdown + blocks)
+│   ├── publish/                    # stages 9-10 against ports: docs, gmail, retry
+│   ├── mcp/                        # THE MCP CLIENT (§11)
+│   │   ├── session.py              # connect (HTTP + bearer token, or stdio), `initialize`
+│   │   ├── discovery.py            # `tools/list`, server name/version check, tool binding
+│   │   ├── contract.py             # loads contract/google-workspace-mcp-0.1.json
+│   │   ├── adapters.py             # the only code that knows tool names: ports -> `tools/call`
+│   │   └── errors.py               # server prose messages -> error codes
+│   └── ui/data.py                  # dashboard data: load a run, re-check, export/verify snapshot
+├── config/                         # pulse.toml, themes.toml, mcp.toml (server URL, tool names)
+├── contract/                       # what the agent sends to / reads from the server
+├── snapshots/<week>.json           # the public dashboard's data (committed, verified)
+├── tests/                          # offline; stubs/stub_mcp_server.py stands in for the server
+├── docs/                           # problem statement, architecture, plan, runbook, context
+├── data/raw/   runs/   .cache/     # exports, run artifacts, caches (all gitignored)
+├── requirements.txt                # for Streamlit Cloud: `.[ui]`
+└── pyproject.toml
 ```
+
+Each run writes `runs/<week>-<nn>/`: `01_raw.json` (deleted after success, O6) through
+`07_validation.json`, `pulse.md`, `09_published.json`, `10_draft.json`, and the ledger
+`run.json`.
 
 ---
 

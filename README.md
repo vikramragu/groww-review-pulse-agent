@@ -175,7 +175,7 @@ What the note's numbers mean:
 
 ```bash
 pip install -e ".[ui]"
-streamlit run streamlit_app.py
+streamlit run frontend/streamlit_app.py
 ```
 
 Five tabs: the weekly pulse and its six checks, all five themes ranked with quotes and
@@ -189,7 +189,7 @@ delivery, and health and settings.
 | Actions | Fetch reviews, analyse a week (dry run), publish to the Doc + draft (behind a confirmation), run `pulse doctor` | None: read-only |
 
 Buttons call the `pulse` CLI, so the dashboard and the terminal can't disagree.
-`PULSE_UI_MODE=snapshot` previews the public view locally.
+`PULSE_UI_MODE=snapshot` previews the public view locally. The app lives in [frontend/](frontend/).
 
 **Updating the public view.** After a week is published:
 
@@ -203,7 +203,7 @@ withholds review ids, every other review's text, the draft id and the private do
 Export refuses a note that fails a check, or anything the PII scanner flags.
 
 **Deploying on Streamlit Community Cloud:** New app → this repository, branch `main`, main
-file `streamlit_app.py`. Dependencies come from `requirements.txt`. No secrets are needed:
+file `frontend/streamlit_app.py`. Dependencies come from `requirements.txt`. No secrets are needed:
 the public app never contacts the MCP server.
 
 ## Troubleshoot

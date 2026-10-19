@@ -938,6 +938,37 @@ pulse run --dry-run --input tests/fixtures/reviews_sample.json
 
 ---
 
+## 9.1 Phase 7 — Dashboard (D11) ✅ COMPLETE (2026-10-19)
+
+**Why.** A CLI is invisible to a reviewer: the only evidence of a run was the Google Doc and a
+Gmail draft. A dashboard shows the note, its checks and the data behind it. Not a brief
+requirement. The problem statement was re-read against a fresh copy on 2026-10-19 and is
+unchanged: Docs + Gmail via MCP remain the delivery surfaces, and the dashboard adds none.
+
+**Rule:** the dashboard adds no logic. It loads the same artifacts, re-runs the same gate,
+and its buttons call the `pulse` CLI.
+
+| ID | Task | Files | Done |
+| --- | --- | --- | --- |
+| P7-T1 | Data layer with no Streamlit import: load a run, re-run the six checks, weekly theme counts, star mix, export funnel | `src/pulse/ui/data.py` | ✅ |
+| P7-T2 | Public snapshot: withholds review ids, quote candidates, draft id and doc link; SHA-256; re-verified on load; export refuses a failing note or a PII hit. `pulse snapshot` writes it | `ui/data.py`, `cli.py`, `snapshots/` | ✅ |
+| P7-T3 | The app: five tabs; local mode (any run; fetch, dry run, publish behind a confirmation, doctor) and public mode (latest snapshot, read-only) | `frontend/streamlit_app.py` | ✅ |
+| P7-T4 | Charts: fixed theme colours (validated CVD-safe, light and dark), legend + table view, hover tooltips | `frontend/streamlit_app.py` | ✅ |
+| P7-T5 | Tests: snapshot privacy, tamper refusal, PII refusal, both app modes render (Streamlit `AppTest`), publish disabled until confirmed | `tests/test_ui.py` | ✅ 12 tests |
+| P7-T6 | Deploy on Streamlit Community Cloud: main file `frontend/streamlit_app.py`, deps from `requirements.txt` (`.[ui]`), no secrets | — | ☐ owner |
+
+**Found while building:**
+
+| Finding | Fix |
+| --- | --- |
+| The PII scanner flagged long float shares (`0.2569444444444444`) as account numbers | Scan only the prose a reader sees, not numbers |
+| The scanner flags the private doc URL | The public snapshot omits it ("published to the team's Google Doc") |
+| `reviews_scrubbed` in the ledger counts reviews *with a redaction*, not reviews after stage 3 | Funnel reports it as "personal details redacted" and takes the analysed count from `corpus_size` |
+| W41-02's ledger predates per-stage usage (P6-T3), so it shows 1 call | The dashboard says so instead of showing a misleading number |
+| Runs sorted by name put an old stub run first | Sorted by last update, so a published run comes first |
+
+---
+
 ## 10. Traceability: acceptance criteria → phase
 
 Every line of problemStatement.md §8, mapped to where it gets satisfied and what proves it.

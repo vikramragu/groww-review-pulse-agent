@@ -31,7 +31,7 @@ anthropic = ["anthropic>=1.0"]
 # Used only by `pulse fetch`, never by the pipeline. Optional so the default install
 # contains no code capable of reaching the network (see ingest/play_store.py).
 scraper = ["google-play-scraper>=1.2.7"]
-# The dashboard (streamlit_app.py). Streamlit Cloud installs it via requirements.txt.
+# The dashboard (frontend/streamlit_app.py). Streamlit Cloud installs it via requirements.txt.
 ui = ["streamlit>=1.50,<2"]
 dev = [
     "pytest>=8",

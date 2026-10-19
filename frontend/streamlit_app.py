@@ -1,6 +1,6 @@
 """Groww Review Pulse — dashboard.
 
-    streamlit run streamlit_app.py
+    streamlit run frontend/streamlit_app.py
 
 **Local** (a `runs/` folder with finished runs): browse any run, check health, fetch
 reviews, run the analysis, and publish to the Doc and a Gmail draft -- each action calls
@@ -37,7 +37,8 @@ from pulse.ui.data import (
     load_snapshot,
 )
 
-ROOT = Path(__file__).resolve().parent
+#: The repository root: the app lives in frontend/, the runs and snapshots beside it.
+ROOT = Path(__file__).resolve().parent.parent
 RUNS = Path(os.environ.get("PULSE_UI_RUNS") or ROOT / "runs")
 SNAPSHOTS = ROOT / "snapshots"
 

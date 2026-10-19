@@ -193,7 +193,8 @@ def _app(monkeypatch: pytest.MonkeyPatch, **env: str) -> Any:
     for key, value in env.items():
         monkeypatch.setenv(key, value)
     return AppTest.from_file(
-        str(Path(__file__).resolve().parent.parent / "streamlit_app.py"), default_timeout=60
+        str(Path(__file__).resolve().parent.parent / "frontend" / "streamlit_app.py"),
+        default_timeout=60,
     ).run()
 
 
