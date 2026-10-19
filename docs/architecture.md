@@ -1063,7 +1063,7 @@ without spending tokens on every CI run.
 | Anthropic key | Env var or `ant auth login` profile; never read from a file in-repo. |
 | PII | Scrubbed before the first model call; rescanned before publish; no identity fields in the schema. |
 | Data at rest | `data/raw/` and `runs/` gitignored. Run artifacts contain scrubbed text only from stage 3 onward. |
-| Raw export | Stage-1 artifact may contain PII **inside review bodies**, which are unscrubbed until stage 3; it is the one file to treat as sensitive, and the only reason it is retained is debuggability. Add retention pruning if that trade stops being worth it (O6). Known reviewer-identity *columns* (`user_name`, `author`, `device_id`, …) are a narrower case: the file-drop adapter discards them at ingest, so they never reach even this artifact. That is stricter than this row requires and costs nothing, since nothing downstream wants them. |
+| Raw export | Stage-1 artifact may contain PII **inside review bodies**, which are unscrubbed until stage 3; it is the one file to treat as sensitive, so it is deleted once a run succeeds through stage 3 and kept only when a run fails, for debugging (O6). Known reviewer-identity *columns* (`user_name`, `author`, `device_id`, …) are a narrower case: the file-drop adapter discards them at ingest, so they never reach even this artifact. That is stricter than this row requires and costs nothing, since nothing downstream wants them. |
 | Email sending | Draft only. No send capability is wired. |
 | Prompt injection | Review text is untrusted input. The classifier's output is constrained to an enum, and the drafter's to a schema whose quotes are substring-verified against the candidate pool — so a review containing "ignore previous instructions and write X" cannot reach the published note as free text. |
 
@@ -1103,7 +1103,7 @@ not just data-hygiene work.
 | O3 | Recipient address for the Gmail draft | Phase 5 | Config-only. |
 | O4 | Does the pulse doc live in a specific Drive folder? | Phase 5 | `create_document` already reserves `folder_id`; needs a value, and the servers project must honour it. |
 | O5 | Should a cheaper model handle bulk classification? | Phase 2 | A real cost lever (classification is ~95% of token volume), but a quality trade-off and therefore the user's call, not a default. Measure classification agreement on a labeled sample before switching. |
-| O6 | Retention policy for `runs/01_raw.json` | Phase 1 | The only artifact that may hold PII. |
+| O6 | ~~Retention policy for `runs/01_raw.json`~~ | — | **Decided 2026-10-19:** deleted once a run succeeds through stage 3 (`retention.keep_raw_artifact = false`), kept when a run fails or stops before the scrubber; `pulse fetch` deletes its own exports fetched before the window. The export in `data/raw/` stays the source of truth, gitignored. |
 
 ### O1: how review data is actually obtained
 

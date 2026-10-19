@@ -81,9 +81,9 @@ config/{pulse,themes,mcp}.toml
 | P0 Skeleton | ✅ complete (2026-10-11) |
 | P1 Ingest, normalize, scrub | ✅ complete |
 | P2 Classification | ✅ complete, including real-data filtering (§5.1 of the plan). One open product decision (below). |
-| P3 Aggregate → draft → validate → render | ✅ complete against the synthetic fixture. **Not yet run end to end on the real reviews** (stages 5–8). |
+| P3 Aggregate → draft → validate → render | ✅ complete, and run on the real reviews 2026-10-19 |
 | P4 Contract, stub, MCP client, publish | ✅ complete against the original `pulse-mcp/1` stub, then superseded by P5 |
-| P5 Live integration | 🔄 **built and green against the stub over stdio and HTTP**; live run waits on credentials (below) |
+| P5 Live integration | ✅ **live** 2026-10-19: published to the scratch and standing docs, drafts created, re-run adds nothing. Only architecture.md §15 is left |
 | P6 Hardening | ☐ not started: no-Google-SDK test, golden end-to-end test, README, runbook, `01_raw.json` retention, sample pulse |
 
 **Verification as of 2026-10-16:**
@@ -168,8 +168,8 @@ and Google authorization (one OAuth token serves both APIs) before any LLM spend
 | D-3 | One standing doc with a section per week | follows from D-2 |
 | D-4 | Which Google account and doc | **pending**: owner to create a scratch doc and the real doc |
 | D-5 | `ALLOWED_RECIPIENT_DOMAINS` on the server | optional, recommended |
-| O6 | Retention of `01_raw.json`, the only artifact that may hold PII as exported | **pending** (P6-T7) |
-| — | `onboarding_kyc` is below the 5% floor | **pending product decision**: merge it, keep it, or widen it (plan §5.1). Any change bumps `taxonomy_version` and re-classifies. |
+| O6 | Retention of `01_raw.json`, the only artifact that may hold PII as exported | **decided 2026-10-19**: deleted after a successful run, kept on failure; `pulse fetch` prunes exports fetched before the window (P6-T7, done) |
+| — | `onboarding_kyc` is below the 5% floor | **decided 2026-10-19: keep it** (plan §5.1). It rarely ranks but surfaces if KYC complaints spike. |
 
 ## Bugs found and fixed (the non-obvious ones)
 

@@ -493,7 +493,9 @@ meant no batch was paid for twice):
 - Tokens ~118k in / ~64k out; the ledger reports cost as unknown for this model, and the
   P2-T10 rate extrapolates to roughly $0.06.
 
-⚠️ **Open decision — `onboarding_kyc` is below the 5% floor.** The plan's rule says revisit the
+✅ **Decided 2026-10-19: keep `onboarding_kyc` as is (option b).** Widening it to login/OTP would move only ~25 reviews (to ~5.3%) and split login failures from the rest of App Reliability; splitting Orders (~115 of 470 mention charts/IPO/price data) is a reasonable later product call. Ranking weighs growth, so a KYC spike still surfaces. No re-classification, `taxonomy_version` unchanged.
+
+~~**Open decision — `onboarding_kyc` is below the 5% floor.**~~ The plan's rule says revisit the
 taxonomy. Options: (a) merge it into a neighbour and split `orders_execution` (the largest,
 27.5%) into trading vs. IPO/market data — keeps five themes; (b) keep it, accepting that
 in the target week it has only 3 reviews and will essentially never rank top-3; (c) widen
@@ -733,7 +735,7 @@ pulse run --mcp stub --input tests/fixtures/reviews_sample.json   # same doc URL
 
 ---
 
-## 8. Phase 5 — Live integration against `google-workspace-mcp` 🔄 built against the stub; live run pending (2026-10-16)
+## 8. Phase 5 — Live integration against `google-workspace-mcp` ✅ live (2026-10-19); §15 docs pending
 
 **Unblocked:** the servers project exists and is deployed.
 
@@ -816,9 +818,9 @@ its README lists create/replace as non-goals. The two ways forward:
 | P5-T5 | **Blocks renderer** from `PulseNote`: heading → `heading1`/`2`, themes and actions → `bullet`, quotes → `paragraph` holding the exact quote text in quotation marks, headline → bold paragraph. Tests: quote text survives byte-for-byte; no markdown syntax leaks; the block count and text sizes stay within server limits; the word count matches `pulse.md` | `rendering/render.py`, `tests/test_render.py` | ✅ |
 | P5-T6 | **Stage 9/10 rework.** Stage 9 runs get-info then append under the week heading, with the publish-record idempotency from 8.2 and `--republish`. Stage 10 calls `gmail_create_draft` with `to=[recipient]`, `body_format="text"`. **Never bind `gmail_send_email`**: binding refuses any tool with `send` in its name, and `contract check` warns if one is advertised | `publish/docs.py`, `publish/gmail.py`, `pipeline.py`, `cli.py` | ✅ + stage 10 skips a draft the week already has |
 | P5-T7 | **Preflight for the real server:** `ping`, then `docs_get_info(configured doc)`. This proves the token, the doc's existence and access, and Docs auth before any LLM spend. Missing config (`PULSE_MCP_TOKEN`, doc ID, recipient) aborts with what to set | `pipeline.py`, `doctor.py` | ✅ (`ping` not needed: `initialize` proves reachability) |
-| P5-T8 | **First live run against a scratch doc** (`PULSE_DOC_ID` = a throwaway doc), because the server's `DRY_RUN` is off. Check the doc's formatting by eye and that the draft is in **Drafts, not Sent** | — | ☐ needs token + scratch doc ID |
-| P5-T9 | **Real run** against the standing doc. Then re-run the same week: confirm no duplicate section, and record the second draft (drafts are still not idempotent) | — | ☐ needs token + standing doc ID |
-| P5-T10 | **Contract tests against live:** `pulse contract check` compares the live `list_tools()` with `contract/google-workspace-mcp-0.1.json`; record any drift | `tests/test_mcp_contract.py` (opt-in live marker) | ◐ `pulse contract check` covers live; run it once the token is set |
+| P5-T8 | **First live run against a scratch doc** (`PULSE_DOC_ID` = a throwaway doc), because the server's `DRY_RUN` is off. Check the doc's formatting by eye and that the draft is in **Drafts, not Sent** | — | ✅ 2026-10-19: 18 blocks appended to the scratch doc; draft in Drafts, nothing sent |
+| P5-T9 | **Real run** against the standing doc. Then re-run the same week: confirm no duplicate section, and record the second draft (drafts are still not idempotent) | — | ✅ 2026-10-19: appended to the standing doc, new draft linking to it; the re-run skipped both |
+| P5-T10 | **Contract tests against live:** `pulse contract check` compares the live `list_tools()` with `contract/google-workspace-mcp-0.1.json`; record any drift | `tests/test_mcp_contract.py` (opt-in live marker) | ✅ 2026-10-19: `OK live`, no drift |
 | P5-T11 | **Docs:** rewrite architecture.md §11 (contract, publishing semantics, auth), §15 failure modes, X1–X5 outcomes; record the deviations here | `docs/architecture.md` | ◐ architecture.md §11 updated; §15 pending |
 
 ⚠️ **Quotes stay verbatim through the block conversion.** Stage 7 proves quotes are exact
@@ -915,7 +917,7 @@ pytest -q                            # offline, against the rewritten stub
 | P6-T4 | End-of-run cost summary line, with cache hit rate called out | `src/pulse/cli.py` |
 | P6-T5 | README: install, configure, drop an export, run, interpret output, troubleshoot | `README.md` |
 | P6-T6 | Runbook: weekly operation, scheduling (cron/CI), what to do on each failure mode in architecture.md §15 | `docs/runbook.md` |
-| P6-T7 | Decide and implement O6 (raw-artifact retention) — prune or document the retention of `01_raw.json` | `src/pulse/orchestrator.py` |
+| P6-T7 | ✅ 2026-10-19. O6 decided and implemented: `01_raw.json` deleted after a run succeeds through stage 3 (ledger `raw_artifact_deleted`), kept on failure; `pulse fetch` prunes its exports fetched before the window (`prune_old_exports`) | `pipeline.py`, `config.py`, `ingest/play_store.py`, `cli.py` |
 | P6-T8 | Walk problemStatement.md §8 line by line, tick each with the command that proves it | `docs/problemStatement.md` |
 | P6-T9 | Capture one real pulse as a reviewed sample output (PII-checked before committing) | `docs/sample-pulse.md` |
 
