@@ -1,0 +1,622 @@
+{
+  "baseline_weeks": 11,
+  "corpus_size": 1708,
+  "corpus_total": 8812,
+  "delivery": {
+    "doc_status": "appended",
+    "document_url": null,
+    "draft_id": "withheld",
+    "draft_status": "created"
+  },
+  "exported_at": "2026-10-19 17:46 UTC",
+  "format": "pulse-snapshot/1",
+  "funnel": {
+    "analysed": 1708,
+    "dropped": {
+      "emoji or punctuation only": 231,
+      "fewer than 9 words": 6257,
+      "non-English (romanized)": 471,
+      "non-Latin script": 145
+    },
+    "duplicates_removed": 3988,
+    "in_window": 8812,
+    "pii_redacted": 6,
+    "rows_exported": 12800,
+    "substantive": 1708
+  },
+  "iso_week": "2026-W41",
+  "markdown": "# Groww Review Pulse — 2026-W41\n\n*1,708 substantive reviews of 8,812 in window*\n\n**Reliability issues rise, fees spike, stop‑loss glitches increase**\n\n## Top themes\n\n- **App Reliability** ▲ (37 reviews, 25.7% of week, +5.6 pts vs prior 11 wks, 2.6★) — App fails to open or shows unhealthy upstream after updates\n- **Charges & Support** ▲ (32 reviews, 22.2% of week, +2.3 pts vs prior 11 wks, 2.6★) — Users complain about high brokerage and unresponsive support\n- **Orders & Execution** ▲ (44 reviews, 30.6% of week, +3.3 pts vs prior 11 wks, 3.7★) — Stop‑loss orders often not placed, causing losses\n\n## What users said\n\n> it's not even opening after updating the app. Always say there seems to be an issue with my internet even though other apps are working fine\n>\n> — 1★, App Reliability\n\n> they are absolute thief, they steel my money twice as Auto square off charges, when i close it manually...! don't trade by this app. give me my money back\n>\n> — 1★, Charges & Support\n\n> Please fix this glitch. Most of the time, the stop-loss doesn’t get placed, and because of this, I end up taking losses.\n>\n> — 3★, Orders & Execution\n\n## What to do next\n\n1. **Add fallback launch path to bypass unhealthy upstream check** (App Reliability) — Reduces login failures after updates\n2. **Introduce transparent brokerage fee breakdown in UI** (Charges & Support) — Helps users understand charges, reduces complaints\n3. **Implement reliable stop‑loss placement verification** (Orders & Execution) — Prevents missed stop‑losses, lowers loss exposure\n",
+  "note": {
+    "actions": [
+      {
+        "action": "Add fallback launch path to bypass unhealthy upstream check",
+        "rationale": "Reduces login failures after updates",
+        "theme": "app_reliability"
+      },
+      {
+        "action": "Introduce transparent brokerage fee breakdown in UI",
+        "rationale": "Helps users understand charges, reduces complaints",
+        "theme": "charges_support"
+      },
+      {
+        "action": "Implement reliable stop‑loss placement verification",
+        "rationale": "Prevents missed stop‑losses, lowers loss exposure",
+        "theme": "orders_execution"
+      }
+    ],
+    "headline": "Reliability issues rise, fees spike, stop‑loss glitches increase",
+    "iso_week": "2026-W41",
+    "quotes": [
+      {
+        "rating": 1,
+        "review_id": "withheld",
+        "text": "it's not even opening after updating the app. Always say there seems to be an issue with my internet even though other apps are working fine",
+        "theme": "app_reliability"
+      },
+      {
+        "rating": 1,
+        "review_id": "withheld",
+        "text": "they are absolute thief, they steel my money twice as Auto square off charges, when i close it manually...! don't trade by this app. give me my money back",
+        "theme": "charges_support"
+      },
+      {
+        "rating": 3,
+        "review_id": "withheld",
+        "text": "Please fix this glitch. Most of the time, the stop-loss doesn’t get placed, and because of this, I end up taking losses.",
+        "theme": "orders_execution"
+      }
+    ],
+    "top_themes": [
+      {
+        "direction": "up",
+        "figures": {
+          "baseline_weeks": 11,
+          "delta_vs_baseline": 0.05553779482807614,
+          "mean_rating": 2.6216216216216215,
+          "review_count": 37,
+          "share_of_week": 0.2569444444444444
+        },
+        "review_count": 37,
+        "summary": "App fails to open or shows unhealthy upstream after updates",
+        "theme": "app_reliability"
+      },
+      {
+        "direction": "up",
+        "figures": {
+          "baseline_weeks": 11,
+          "delta_vs_baseline": 0.02273373117362887,
+          "mean_rating": 2.5625,
+          "review_count": 32,
+          "share_of_week": 0.2222222222222222
+        },
+        "review_count": 32,
+        "summary": "Users complain about high brokerage and unresponsive support",
+        "theme": "charges_support"
+      },
+      {
+        "direction": "up",
+        "figures": {
+          "baseline_weeks": 11,
+          "delta_vs_baseline": 0.033177038931514635,
+          "mean_rating": 3.7045454545454546,
+          "review_count": 44,
+          "share_of_week": 0.3055555555555556
+        },
+        "review_count": 44,
+        "summary": "Stop‑loss orders often not placed, causing losses",
+        "theme": "orders_execution"
+      }
+    ]
+  },
+  "ratings": {
+    "week": {
+      "1": 64,
+      "2": 5,
+      "3": 6,
+      "4": 11,
+      "5": 58
+    },
+    "window": {
+      "1": 705,
+      "2": 101,
+      "3": 147,
+      "4": 149,
+      "5": 606
+    }
+  },
+  "run_id": "2026-W41-02",
+  "sha256": "fbd252c7630f1f9d7596d3afe9c10a2494fd0d60157c01e3f0c498adfc1f8c00",
+  "themes": [
+    {
+      "delta_vs_baseline": 0.05553779482807614,
+      "label": "App Reliability",
+      "mean_rating": 2.6216216216216215,
+      "on_page": true,
+      "review_count": 37,
+      "share_of_week": 0.2569444444444444,
+      "theme": "app_reliability"
+    },
+    {
+      "delta_vs_baseline": 0.02273373117362887,
+      "label": "Charges & Support",
+      "mean_rating": 2.5625,
+      "on_page": true,
+      "review_count": 32,
+      "share_of_week": 0.2222222222222222,
+      "theme": "charges_support"
+    },
+    {
+      "delta_vs_baseline": 0.033177038931514635,
+      "label": "Orders & Execution",
+      "mean_rating": 3.7045454545454546,
+      "on_page": true,
+      "review_count": 44,
+      "share_of_week": 0.3055555555555556,
+      "theme": "orders_execution"
+    },
+    {
+      "delta_vs_baseline": 0.006784597897129874,
+      "label": "Payments & Withdrawals",
+      "mean_rating": 2.1,
+      "on_page": false,
+      "review_count": 10,
+      "share_of_week": 0.06944444444444445,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "delta_vs_baseline": -0.019447996589940324,
+      "label": "Onboarding & KYC",
+      "mean_rating": 1.0,
+      "on_page": false,
+      "review_count": 3,
+      "share_of_week": 0.020833333333333332,
+      "theme": "onboarding_kyc"
+    }
+  ],
+  "usage": {
+    "cache_hit_rate": null,
+    "calls": 1,
+    "complete": false,
+    "estimated_cost_usd": null,
+    "input_tokens": 2305,
+    "model": "openai/gpt-oss-120b",
+    "output_tokens": 1433
+  },
+  "verbatim_at_export": true,
+  "week_review_count": 144,
+  "weekly": [
+    {
+      "count": 2,
+      "iso_week": "2026-W30",
+      "share": 0.020618556701030927,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 31,
+      "iso_week": "2026-W30",
+      "share": 0.31958762886597936,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 7,
+      "iso_week": "2026-W30",
+      "share": 0.07216494845360824,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 22,
+      "iso_week": "2026-W30",
+      "share": 0.2268041237113402,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 20,
+      "iso_week": "2026-W30",
+      "share": 0.20618556701030927,
+      "theme": "charges_support"
+    },
+    {
+      "count": 15,
+      "iso_week": "2026-W30",
+      "share": 0.15463917525773196,
+      "theme": "unclassified"
+    },
+    {
+      "count": 7,
+      "iso_week": "2026-W31",
+      "share": 0.05555555555555555,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 24,
+      "iso_week": "2026-W31",
+      "share": 0.19047619047619047,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 12,
+      "iso_week": "2026-W31",
+      "share": 0.09523809523809523,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 29,
+      "iso_week": "2026-W31",
+      "share": 0.23015873015873015,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 20,
+      "iso_week": "2026-W31",
+      "share": 0.15873015873015872,
+      "theme": "charges_support"
+    },
+    {
+      "count": 34,
+      "iso_week": "2026-W31",
+      "share": 0.2698412698412698,
+      "theme": "unclassified"
+    },
+    {
+      "count": 1,
+      "iso_week": "2026-W32",
+      "share": 0.006060606060606061,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 47,
+      "iso_week": "2026-W32",
+      "share": 0.28484848484848485,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 16,
+      "iso_week": "2026-W32",
+      "share": 0.09696969696969697,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 24,
+      "iso_week": "2026-W32",
+      "share": 0.14545454545454545,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 37,
+      "iso_week": "2026-W32",
+      "share": 0.22424242424242424,
+      "theme": "charges_support"
+    },
+    {
+      "count": 40,
+      "iso_week": "2026-W32",
+      "share": 0.24242424242424243,
+      "theme": "unclassified"
+    },
+    {
+      "count": 7,
+      "iso_week": "2026-W33",
+      "share": 0.04895104895104895,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 32,
+      "iso_week": "2026-W33",
+      "share": 0.22377622377622378,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 6,
+      "iso_week": "2026-W33",
+      "share": 0.04195804195804196,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 27,
+      "iso_week": "2026-W33",
+      "share": 0.1888111888111888,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 32,
+      "iso_week": "2026-W33",
+      "share": 0.22377622377622378,
+      "theme": "charges_support"
+    },
+    {
+      "count": 39,
+      "iso_week": "2026-W33",
+      "share": 0.2727272727272727,
+      "theme": "unclassified"
+    },
+    {
+      "count": 6,
+      "iso_week": "2026-W34",
+      "share": 0.049586776859504134,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 53,
+      "iso_week": "2026-W34",
+      "share": 0.4380165289256198,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 5,
+      "iso_week": "2026-W34",
+      "share": 0.04132231404958678,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 23,
+      "iso_week": "2026-W34",
+      "share": 0.19008264462809918,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 22,
+      "iso_week": "2026-W34",
+      "share": 0.18181818181818182,
+      "theme": "charges_support"
+    },
+    {
+      "count": 12,
+      "iso_week": "2026-W34",
+      "share": 0.09917355371900827,
+      "theme": "unclassified"
+    },
+    {
+      "count": 3,
+      "iso_week": "2026-W35",
+      "share": 0.013513513513513514,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 56,
+      "iso_week": "2026-W35",
+      "share": 0.25225225225225223,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 10,
+      "iso_week": "2026-W35",
+      "share": 0.04504504504504504,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 47,
+      "iso_week": "2026-W35",
+      "share": 0.21171171171171171,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 39,
+      "iso_week": "2026-W35",
+      "share": 0.17567567567567569,
+      "theme": "charges_support"
+    },
+    {
+      "count": 67,
+      "iso_week": "2026-W35",
+      "share": 0.30180180180180183,
+      "theme": "unclassified"
+    },
+    {
+      "count": 4,
+      "iso_week": "2026-W36",
+      "share": 0.023121387283236993,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 40,
+      "iso_week": "2026-W36",
+      "share": 0.23121387283236994,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 7,
+      "iso_week": "2026-W36",
+      "share": 0.04046242774566474,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 42,
+      "iso_week": "2026-W36",
+      "share": 0.24277456647398843,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 38,
+      "iso_week": "2026-W36",
+      "share": 0.21965317919075145,
+      "theme": "charges_support"
+    },
+    {
+      "count": 42,
+      "iso_week": "2026-W36",
+      "share": 0.24277456647398843,
+      "theme": "unclassified"
+    },
+    {
+      "count": 6,
+      "iso_week": "2026-W37",
+      "share": 0.04878048780487805,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 28,
+      "iso_week": "2026-W37",
+      "share": 0.22764227642276422,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 6,
+      "iso_week": "2026-W37",
+      "share": 0.04878048780487805,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 27,
+      "iso_week": "2026-W37",
+      "share": 0.21951219512195122,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 26,
+      "iso_week": "2026-W37",
+      "share": 0.21138211382113822,
+      "theme": "charges_support"
+    },
+    {
+      "count": 30,
+      "iso_week": "2026-W37",
+      "share": 0.24390243902439024,
+      "theme": "unclassified"
+    },
+    {
+      "count": 12,
+      "iso_week": "2026-W38",
+      "share": 0.07792207792207792,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 42,
+      "iso_week": "2026-W38",
+      "share": 0.2727272727272727,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 12,
+      "iso_week": "2026-W38",
+      "share": 0.07792207792207792,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 27,
+      "iso_week": "2026-W38",
+      "share": 0.17532467532467533,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 33,
+      "iso_week": "2026-W38",
+      "share": 0.21428571428571427,
+      "theme": "charges_support"
+    },
+    {
+      "count": 28,
+      "iso_week": "2026-W38",
+      "share": 0.18181818181818182,
+      "theme": "unclassified"
+    },
+    {
+      "count": 11,
+      "iso_week": "2026-W39",
+      "share": 0.07142857142857142,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 44,
+      "iso_week": "2026-W39",
+      "share": 0.2857142857142857,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 13,
+      "iso_week": "2026-W39",
+      "share": 0.08441558441558442,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 36,
+      "iso_week": "2026-W39",
+      "share": 0.23376623376623376,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 29,
+      "iso_week": "2026-W39",
+      "share": 0.18831168831168832,
+      "theme": "charges_support"
+    },
+    {
+      "count": 21,
+      "iso_week": "2026-W39",
+      "share": 0.13636363636363635,
+      "theme": "unclassified"
+    },
+    {
+      "count": 4,
+      "iso_week": "2026-W40",
+      "share": 0.046511627906976744,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 29,
+      "iso_week": "2026-W40",
+      "share": 0.3372093023255814,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 4,
+      "iso_week": "2026-W40",
+      "share": 0.046511627906976744,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 11,
+      "iso_week": "2026-W40",
+      "share": 0.12790697674418605,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 16,
+      "iso_week": "2026-W40",
+      "share": 0.18604651162790697,
+      "theme": "charges_support"
+    },
+    {
+      "count": 22,
+      "iso_week": "2026-W40",
+      "share": 0.2558139534883721,
+      "theme": "unclassified"
+    },
+    {
+      "count": 3,
+      "iso_week": "2026-W41",
+      "share": 0.020833333333333332,
+      "theme": "onboarding_kyc"
+    },
+    {
+      "count": 44,
+      "iso_week": "2026-W41",
+      "share": 0.3055555555555556,
+      "theme": "orders_execution"
+    },
+    {
+      "count": 10,
+      "iso_week": "2026-W41",
+      "share": 0.06944444444444445,
+      "theme": "payments_withdrawals"
+    },
+    {
+      "count": 37,
+      "iso_week": "2026-W41",
+      "share": 0.2569444444444444,
+      "theme": "app_reliability"
+    },
+    {
+      "count": 32,
+      "iso_week": "2026-W41",
+      "share": 0.2222222222222222,
+      "theme": "charges_support"
+    },
+    {
+      "count": 18,
+      "iso_week": "2026-W41",
+      "share": 0.125,
+      "theme": "unclassified"
+    }
+  ],
+  "window": "2026-W30..2026-W41"
+}

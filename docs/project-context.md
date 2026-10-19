@@ -84,6 +84,7 @@ config/{pulse,themes,mcp}.toml
 | P3 Aggregate → draft → validate → render | ✅ complete, and run on the real reviews 2026-10-19 |
 | P4 Contract, stub, MCP client, publish | ✅ complete against the original `pulse-mcp/1` stub, then superseded by P5 |
 | P5 Live integration | ✅ **complete** 2026-10-19: published to the scratch and standing docs, drafts created, re-run adds nothing; architecture.md §15 rewritten |
+| Dashboard (D11) | ✅ 2026-10-19: `streamlit_app.py`, local (all runs, actions behind a confirmation) and public (verified `snapshots/<week>.json`). Deploy on Streamlit Community Cloud |
 | P6 Hardening | 🔄 T1–T8 done 2026-10-19 (no-Google-SDK test, golden end-to-end test, ledger usage fix, cost line, README, runbook, retention, acceptance walk). T9 sample pulse awaits a decision |
 
 **Verification as of 2026-10-19:**
@@ -231,7 +232,9 @@ Stub state persists in `.cache/stub-mcp-state.json`; delete it to start from an 
 
 ## Next steps, in order
 
-1. **P6-T9 sample pulse:** decide whether to commit the real 2026-W41 note (three short
+0. **Deploy the dashboard** on Streamlit Community Cloud (repo `main`, `streamlit_app.py`).
+   After each published week: `pulse snapshot`, commit, push.
+1. **P6-T9 sample pulse:** largely answered by the public snapshot (D11), which shows the real note; decide whether to commit the real 2026-W41 note (three short
    public quotes, scrubbed) as `docs/sample-pulse.md`, or point at the synthetic golden note.
 2. **Railway:** set `ALLOWED_DOCUMENT_IDS` (standing + scratch doc) and
    `ALLOWED_RECIPIENT_DOMAINS`, redeploy, then `pulse doctor`.

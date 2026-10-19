@@ -24,6 +24,7 @@ Play Store export ──▶ agent (this repo) ──MCP over HTTPS + bearer toke
 - [Get review data](#get-review-data)
 - [Run](#run)
 - [Read the output](#read-the-output)
+- [Dashboard](#dashboard)
 - [Troubleshoot](#troubleshoot)
 - [Development](#development)
 - [Documentation](#documentation)
@@ -170,6 +171,41 @@ What the note's numbers mean:
 - **Themes are ranked**, not only counted: how negative a theme is and how fast it is
   rising both count, so the biggest theme is not always first.
 
+## Dashboard
+
+```bash
+pip install -e ".[ui]"
+streamlit run streamlit_app.py
+```
+
+Five tabs: the weekly pulse and its six checks, all five themes ranked with quotes and
+actions, review statistics (theme share by week, star ratings, export → analysis funnel),
+delivery, and health and settings.
+
+| | Local (`runs/` present) | Public (Streamlit Cloud) |
+| --- | --- | --- |
+| Data | Any run in `runs/` | The latest `snapshots/<week>.json` |
+| Checks | Recomputed against the candidate pools | Recomputed on load; SHA-256 must match; verbatim recorded at export |
+| Actions | Fetch reviews, analyse a week (dry run), publish to the Doc + draft (behind a confirmation), run `pulse doctor` | None: read-only |
+
+Buttons call the `pulse` CLI, so the dashboard and the terminal can't disagree.
+`PULSE_UI_MODE=snapshot` previews the public view locally.
+
+**Updating the public view.** After a week is published:
+
+```bash
+pulse snapshot                      # latest finished run -> snapshots/<week>.json
+git add snapshots && git commit -m "snapshot: <week>" && git push
+```
+
+A snapshot holds the published note (including its three quotes) and figures. It
+withholds review ids, every other review's text, the draft id and the private doc link.
+Export refuses a note that fails a check, or anything the PII scanner flags.
+
+**Deploying on Streamlit Community Cloud:** New app → this repository, branch `main`, main
+file `streamlit_app.py`. Dependencies come from `requirements.txt`. No secrets are needed:
+the public app never contacts the MCP server.
+
 ## Troubleshoot
 
 `pulse doctor` names most problems directly. Common ones:
@@ -212,5 +248,5 @@ gitignored.
 | [docs/architecture.md](docs/architecture.md) | Design and decisions; §11 the MCP layer, §15 failure modes |
 | [docs/implementation-plan.md](docs/implementation-plan.md) | Phase-by-phase build log |
 | [docs/project-context.md](docs/project-context.md) | Handoff summary: status, decisions, what's pending |
-| [docs/runbook.md](docs/runbook.md) | Weekly operation and recovery |
+| [docs/runbook.md](docs/runbook.md) | Weekly operation and recovery, including the snapshot |
 | [docs/input-format.md](docs/input-format.md) | The review export format |

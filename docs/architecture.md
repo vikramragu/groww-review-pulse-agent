@@ -32,8 +32,9 @@ against a contract-conforming stub.
 
 **Out of scope here:** Google OAuth and credential storage, Google Docs/Gmail REST calls, MCP
 server implementation, token refresh — all of that belongs to the servers project. Also out of
-scope: **Apple App Store / iOS reviews** (deferred, D10), a web UI, a hosted scheduler,
-multi-product support, review reply automation, sentiment dashboards.
+scope: **Apple App Store / iOS reviews** (deferred, D10), a hosted scheduler, multi-product
+support, review reply automation, sentiment dashboards. (A web UI was out of scope until
+D11 added a read-mostly dashboard.)
 
 ### 1.2 What the split changes
 
@@ -67,6 +68,7 @@ projects' release cycles together for no gain.
 | D8 | MCP servers | **Built in a separate project; this repo is the client only** | Separates Google auth and REST concerns from analysis concerns, and lets the two halves ship independently. The agent depends on a versioned tool contract, not on a server implementation. |
 | D9 | Contract ownership | **Agent-side spec (§11.2), versioned, mirrored into the servers project** | We own both sides, so the interface must be written down once and referenced by both — otherwise it lives only in whichever codebase was edited last. |
 | D10 | Store scope | **Google Play Store only; Apple App Store deferred** | The brief names both stores but supplies only a Play Store URL, and the product is Android-first. One store removes a whole adapter, a second export format, and cross-store normalization questions (differing rating semantics, locale handling, date formats) from the critical path. The `source` field is retained so re-adding iOS is additive. |
+| D11 | Dashboard | **A Streamlit view over runs (local) and a verified snapshot (public)**, added 2026-10-19 | A CLI is invisible to reviewers and stakeholders. The dashboard adds no logic: `pulse.ui.data` loads the same artifacts and re-runs the same gate, and its buttons call the `pulse` CLI. Publicly it serves only `snapshots/<week>.json`, which withholds review ids, quote candidates, the draft id and the private doc link, carries a SHA-256, and is re-checked on load. Its three published quotes are a deliberate exception to "no real reviews in git": they are already public, anonymous and scrubbed, and are what the note exists to show. |
 
 ---
 

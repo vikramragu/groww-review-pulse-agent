@@ -31,6 +31,8 @@ Then, before anything reaches anyone:
    model's reading of them.
 2. **Open the Gmail draft, edit it if needed, and send it yourself.** The agent never
    sends anything.
+3. **Update the public dashboard:** `pulse snapshot`, then commit and push
+   `snapshots/<week>.json`. Streamlit Cloud redeploys on push.
 
 If the week shows `skipped`, it was already published to this doc. That's intended.
 
