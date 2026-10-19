@@ -994,13 +994,20 @@ being built; `pulse contract check` is what catches the two projects drifting ap
 | Rate limit / 5xx | SDK | SDK retries (2); orchestrator surfaces the request id |
 | Note fails validation 3× | Stage 7 | Abort; write `07_validation.json` with every failure |
 | PII detected in rendered note | Stage 7 | Abort immediately; flag as a scrubber defect |
-| MCP server unauthorized (`AUTH_REQUIRED`) | `doctor` / startup probe | Abort before LLM spend; point at the servers project's auth instructions |
-| MCP server not installed / won't spawn | Startup probe | Abort; name the configured command and suggest `--mcp stub` |
-| Contract version mismatch | `initialize` server info | Minor → warn and continue; major → abort naming both versions |
-| Configured tool missing from `list_tools()` | Startup probe | Abort; list what the server actually advertises |
-| `REVISION_MISMATCH` on doc replace | Stage 9 | Someone edited the doc by hand. Re-find, report the conflict, do not blind-overwrite |
-| `RATE_LIMITED` from a server | Stage 9/10 | Honour `retry_after_seconds`, up to 3 attempts |
-| Docs update succeeds, Gmail fails | Stage 10 | Keep the doc, report partial success, record in the ledger; `--from 10` retries just the draft |
+| Failed draft on a replay (`--from 5`/`--from 6`) | Stage 6 | Abort, and delete the previous `06_note.json` and `pulse.md` so a later `--from 9` cannot publish a note this run rejected |
+| Wrong or missing bearer token (HTTP 401/403) | Preflight, `doctor` | Abort before any LLM spend; the error names `PULSE_MCP_TOKEN` and the server's `MCP_AUTH_TOKEN`. Usual cause: the server was not redeployed after the variable changed |
+| Server unreachable or slow to start | Preflight | Abort before any LLM spend ("could not be reached" / "did not finish `initialize` in time"); `GET /healthz` on the server URL tells a down server from a wrong token |
+| Server name or version drift | `initialize` server info | Name must be `google-workspace-mcp`. Major 0: a different minor aborts (0.x minors may break); patch ignored. `pulse contract check` shows what changed |
+| A used tool missing, or its schema no longer accepts our request | Preflight / `pulse contract check` | Abort, listing what the server advertises. `FEATURE_DISABLED` usually means `ENABLE_DOCS_APPEND` / `ENABLE_GMAIL_DRAFTS` is off on Railway |
+| Server advertises `gmail_send_email` | Discovery | Warn; never bound (`never_bind`). Means `ENABLE_GMAIL_SEND` is on again (D-1) |
+| Google authorization lost (`AUTH_REQUIRED`) | Preflight `docs_get_info` | Abort before LLM spend; re-run the server's `npm run auth` and redeploy its token |
+| Doc not found / not shared, or no edit access (`NOT_FOUND`, `PERMISSION_DENIED`) | Preflight `docs_get_info` | Abort; check `PULSE_DOC_ID` / `[docs] document_id`, and that the doc belongs to (or is shared with edit rights to) the server's Google account, and is on `ALLOWED_DOCUMENT_IDS` if that is set |
+| Recipient blocked (`PERMISSION_DENIED`: domain not allowed) | Stage 10 | Abort stage 10; the doc stays published. Fix `PULSE_RECIPIENT` or the server's `ALLOWED_RECIPIENT_DOMAINS`, then `--from 10` |
+| Google API temporarily unavailable (`UNAVAILABLE`) | Stage 9/10 | The server has already retried 429/5xx itself; the agent waits 5 s, 10 s and retries up to 3 attempts in all |
+| Unrecognised error message | Stage 9/10 | `UPSTREAM_ERROR`, with the server's text preserved |
+| Week already published to this doc | Stage 9 | Skip, from the local publish record (`09_published.json` in any run). `--republish` appends a second section on purpose. A clean checkout forgets the record (risk register) |
+| Week already drafted for this doc | Stage 10 | Skip. A draft linking to a different doc (e.g. the scratch doc) does not count |
+| Docs append succeeds, Gmail fails | Stage 10 | Keep the doc, report partial success, record in the ledger; `--from 10` retries just the draft |
 
 **Partial-failure stance:** stages 9 and 10 are not transactional, and pretending otherwise would
 mean deleting a perfectly good published document because a draft call timed out. The run ledger

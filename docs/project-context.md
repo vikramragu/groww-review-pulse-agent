@@ -1,7 +1,7 @@
 # Project Context
 
 A handoff reference: what this project is, what has been built and verified, what was
-decided and why, and what is pending. Last updated **2026-10-16**.
+decided and why, and what is pending. Last updated **2026-10-19**.
 
 For the original requirements see [problemStatement.md](problemStatement.md). For the
 design, [architecture.md](architecture.md); start with §11.0 for the MCP layer as built.
@@ -83,16 +83,17 @@ config/{pulse,themes,mcp}.toml
 | P2 Classification | ✅ complete, including real-data filtering (§5.1 of the plan). One open product decision (below). |
 | P3 Aggregate → draft → validate → render | ✅ complete, and run on the real reviews 2026-10-19 |
 | P4 Contract, stub, MCP client, publish | ✅ complete against the original `pulse-mcp/1` stub, then superseded by P5 |
-| P5 Live integration | ✅ **live** 2026-10-19: published to the scratch and standing docs, drafts created, re-run adds nothing. Only architecture.md §15 is left |
-| P6 Hardening | ☐ not started: no-Google-SDK test, golden end-to-end test, README, runbook, `01_raw.json` retention, sample pulse |
+| P5 Live integration | ✅ **complete** 2026-10-19: published to the scratch and standing docs, drafts created, re-run adds nothing; architecture.md §15 rewritten |
+| P6 Hardening | 🔄 T1–T8 done 2026-10-19 (no-Google-SDK test, golden end-to-end test, ledger usage fix, cost line, README, runbook, retention, acceptance walk). T9 sample pulse awaits a decision |
 
-**Verification as of 2026-10-16:**
-- `pytest -q` → **771 passed**; `ruff check`, `ruff format --check` and `mypy src` are clean.
-- `pulse contract check` → `OK stub`, `SKIP live` (no token yet).
-- `pulse doctor` → `OK mcp-stub`, `WARN mcp-live` (no token), `WARN mcp-doc` (no doc ID).
+**Verification as of 2026-10-19:**
+- `pytest -q` → **852 passed**; `ruff check`, `ruff format --check` and `mypy src` are clean.
+- `pulse contract check` → `OK stub`, `OK live`.
+- `pulse doctor` → all checks pass against the live server and the standing doc.
+- Live 2026-W41: appended to the standing doc, draft created, same-week re-run skipped both.
 
-⚠️ **Nothing from Phase 2 onward is committed.** About 50 files are modified or new in the
-working tree. Commit before any destructive git operation.
+Everything is committed on `master`. There is **no git remote yet**: create an empty
+(private) GitHub repo and push.
 
 ## Data: what the real corpus looks like
 
@@ -195,17 +196,16 @@ the variables. See `.env.example`.
 | Variable | Purpose | Set? |
 | --- | --- | --- |
 | `GROQ_API_KEY` | stages 4 and 6 | yes |
-| `PULSE_MCP_TOKEN` | bearer token for the live server; must equal the server's `MCP_AUTH_TOKEN` | **no** |
-| `PULSE_DOC_ID` | the standing doc (a scratch doc for the first live run) | **no** |
-| `PULSE_RECIPIENT` | Gmail draft recipient | **no** |
+| `PULSE_MCP_TOKEN` | bearer token for the live server; must equal the server's `MCP_AUTH_TOKEN` | yes (rotated 2026-10-19) |
+| `PULSE_DOC_ID` | optional override of `[docs] document_id`; the scratch doc's ID is kept commented out in `.env` | commented out |
+| `PULSE_RECIPIENT` | Gmail draft recipient | yes |
 
 **Security notes:**
-- The server's `MCP_AUTH_TOKEN` was rotated after an earlier one was pasted into a chat. The
-  owner reports the live value differs from the replacement the server repo's notes mention,
-  so **rotate it if there is any doubt**.
+- The server's `MCP_AUTH_TOKEN` was rotated on 2026-10-19 and `ENABLE_GMAIL_SEND=false` is
+  applied (D-1). See runbook.md for rotation.
 - Never paste a token into chat, a commit, or a doc. Prefixes included.
-- The server's `DRY_RUN=false`: live writes are real. Do the first live run against a
-  scratch doc.
+- The server's `DRY_RUN=false`: live writes are real. Test changes against the scratch doc
+  (uncomment `PULSE_DOC_ID` in `.env`).
 
 ## How to run
 
@@ -230,15 +230,9 @@ Stub state persists in `.cache/stub-mcp-state.json`; delete it to start from an 
 
 ## Next steps, in order
 
-1. **Owner:** set `ENABLE_GMAIL_SEND=false` on Railway; rotate the token if unsure. Add
-   `PULSE_MCP_TOKEN`, `PULSE_DOC_ID` (a scratch doc) and `PULSE_RECIPIENT` to `.env`.
-2. Run `pulse doctor` and `pulse contract check` against the live server. Both are
-   read-only. Record any drift (P5-T10).
-3. Run the real-data stages 5–8 dry run, which has never been done on real reviews:
-   `pulse run --dry-run --run-dir runs/2026-W41-02 --from 5 --week 2026-W41`.
-4. First live run against the **scratch** doc (P5-T8). Check the formatting by eye, and
-   that the draft is in **Drafts, not Sent**.
-5. Live run against the standing doc, then a same-week re-run that should add nothing (P5-T9).
-6. Decide `onboarding_kyc`, then Phase 6 (hardening, README, runbook, `01_raw.json`
-   retention, sample pulse).
-7. Commit the working tree, split by task ID.
+1. **P6-T9 sample pulse:** decide whether to commit the real 2026-W41 note (three short
+   public quotes, scrubbed) as `docs/sample-pulse.md`, or point at the synthetic golden note.
+2. **Push:** create an empty private GitHub repo; add it as `origin`; push `master` as `main`.
+3. **Server repo:** its `docs/deployment-plan.md` still says Railway provisioning is left;
+   it is deployed.
+4. Weekly operation per [runbook.md](runbook.md).

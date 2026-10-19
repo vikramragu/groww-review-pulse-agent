@@ -735,7 +735,7 @@ pulse run --mcp stub --input tests/fixtures/reviews_sample.json   # same doc URL
 
 ---
 
-## 8. Phase 5 — Live integration against `google-workspace-mcp` ✅ live (2026-10-19); §15 docs pending
+## 8. Phase 5 — Live integration against `google-workspace-mcp` ✅ COMPLETE (2026-10-19)
 
 **Unblocked:** the servers project exists and is deployed.
 
@@ -821,7 +821,7 @@ its README lists create/replace as non-goals. The two ways forward:
 | P5-T8 | **First live run against a scratch doc** (`PULSE_DOC_ID` = a throwaway doc), because the server's `DRY_RUN` is off. Check the doc's formatting by eye and that the draft is in **Drafts, not Sent** | — | ✅ 2026-10-19: 18 blocks appended to the scratch doc; draft in Drafts, nothing sent |
 | P5-T9 | **Real run** against the standing doc. Then re-run the same week: confirm no duplicate section, and record the second draft (drafts are still not idempotent) | — | ✅ 2026-10-19: appended to the standing doc, new draft linking to it; the re-run skipped both |
 | P5-T10 | **Contract tests against live:** `pulse contract check` compares the live `list_tools()` with `contract/google-workspace-mcp-0.1.json`; record any drift | `tests/test_mcp_contract.py` (opt-in live marker) | ✅ 2026-10-19: `OK live`, no drift |
-| P5-T11 | **Docs:** rewrite architecture.md §11 (contract, publishing semantics, auth), §15 failure modes, X1–X5 outcomes; record the deviations here | `docs/architecture.md` | ◐ architecture.md §11 updated; §15 pending |
+| P5-T11 | **Docs:** rewrite architecture.md §11 (contract, publishing semantics, auth), §15 failure modes, X1–X5 outcomes; record the deviations here | `docs/architecture.md` | ✅ §11 and §15 updated (2026-10-19) |
 
 ⚠️ **Quotes stay verbatim through the block conversion.** Stage 7 proves quotes are exact
 substrings of reviews in `pulse.md`. The blocks renderer is a second render path, so P5-T5 must
@@ -905,20 +905,20 @@ pytest -q                            # offline, against the rewritten stub
 
 ---
 
-## 9. Phase 6 — Hardening
+## 9. Phase 6 — Hardening 🔄 T1–T8 complete (2026-10-19); T9 awaits a decision
 
 **Goal:** green from a clean checkout; every acceptance-checklist line verifiable.
 
 | ID | Task | Files |
 | --- | --- | --- |
-| P6-T1 | `test_no_google_sdk.py` — fail if `googleapiclient`, `google-auth`, `google-api-python-client`, or `oauth2client` resolve in the dependency tree | `tests/test_no_google_sdk.py` |
-| P6-T2 | Golden end-to-end test: fixture corpus + committed classification → note render, fully offline | `tests/test_golden.py` |
-| P6-T3 | Complete the run ledger: corpus size, per-theme counts, tokens, cost, cache rate, attempts, doc URL, draft id, wall time | `src/pulse/orchestrator.py` |
-| P6-T4 | End-of-run cost summary line, with cache hit rate called out | `src/pulse/cli.py` |
-| P6-T5 | README: install, configure, drop an export, run, interpret output, troubleshoot | `README.md` |
-| P6-T6 | Runbook: weekly operation, scheduling (cron/CI), what to do on each failure mode in architecture.md §15 | `docs/runbook.md` |
+| P6-T1 | ✅ `test_no_google_sdk.py` — checks pyproject (all extras), the installed tree and every import in `src/`/`scripts/`; `google-play-scraper` allowed (no credential) | `tests/test_no_google_sdk.py` |
+| P6-T2 | ✅ Golden end-to-end: fixture → stages 1-3 → committed labels as stage 4 → scripted draft → stub stages 9-10; `pulse.md` byte-compared with `tests/fixtures/pulse_golden.md` (`UPDATE_GOLDEN=1` regenerates) | `tests/test_golden.py` |
+| P6-T3 | ✅ Ledger complete. **Bug found:** stage 6 overwrote stage 4's usage (the real run recorded 1 call after 43 batches). Now `usage_by_stage` + summed total, measured as snapshot differences; `classification_cache_hit_rate` added. Wall time is per-stage `duration_ms` | `pipeline.py`, `models.py` |
+| P6-T4 | ✅ One line: calls, tokens, cost ("cost unknown" when no price is known, never $0), classification cache hits | `src/pulse/cli.py` |
+| P6-T5 | ✅ Rewritten for the live system | `README.md` |
+| P6-T6 | ✅ Weekly routine, cron, token rotation, recovery per failure (with §15 rewritten for the live server) | `docs/runbook.md` |
 | P6-T7 | ✅ 2026-10-19. O6 decided and implemented: `01_raw.json` deleted after a run succeeds through stage 3 (ledger `raw_artifact_deleted`), kept on failure; `pulse fetch` prunes its exports fetched before the window (`prune_old_exports`) | `pipeline.py`, `config.py`, `ingest/play_store.py`, `cli.py` |
-| P6-T8 | Walk problemStatement.md §8 line by line, tick each with the command that proves it | `docs/problemStatement.md` |
+| P6-T8 | ✅ Every §8 line ticked with its proof; §9-10 brought up to date | `docs/problemStatement.md` |
 | P6-T9 | Capture one real pulse as a reviewed sample output (PII-checked before committing) | `docs/sample-pulse.md` |
 
 ⚠️ **P6-T7 is the last privacy loose end.** `01_raw.json` is the one artifact that may contain PII

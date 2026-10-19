@@ -69,7 +69,9 @@ app = typer.Typer(
     add_completion=False,
 )
 
-contract_app = typer.Typer(name="contract", help="Inspect the pulse-mcp tool contract.")
+contract_app = typer.Typer(
+    name="contract", help="Check the MCP server against the agent's tool contract."
+)
 app.add_typer(contract_app)
 
 

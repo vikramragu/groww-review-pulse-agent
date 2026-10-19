@@ -128,17 +128,38 @@ Consequences for *this* repo's scope:
 
 ## 8. Acceptance Checklist
 
-- [ ] **Play Store** reviews imported from the last 8–12 weeks, from a public export source
-- [ ] Reviews clustered into **≤5** themes
-- [ ] One-page note written, **≤250 words**
-- [ ] Note contains top **3** themes
-- [ ] Note contains **3** verbatim user quotes (unaltered wording, no PII)
-- [ ] Note contains **3** concrete action ideas tied to the themes
-- [ ] Note published to a **Google Doc** via MCP
-- [ ] **Gmail draft** created via MCP, containing the note or a link to it
-- [ ] No PII anywhere in any artifact
-- [ ] No direct Google REST/OAuth code used as the primary integration path
-- [ ] No Google SDK in this repo's dependency tree (the servers project owns that)
+Walked line by line on 2026-10-19 (implementation-plan.md P6-T8). Each item names what
+proves it; "live" means the 2026-W41 run against the deployed server.
+
+- [x] **Play Store** reviews imported from the last 8–12 weeks, from a public export source
+  — `pulse fetch` export: 12 complete ISO weeks (W30–W41), no identity fields;
+  `test_normalize.py` window tests; `pulse doctor`. *Caveat:* there is no official public
+  export for a non-owner, so `pulse fetch` reads public but undocumented endpoints
+  (architecture.md O1, risk register).
+- [x] Reviews clustered into **≤5** themes — `Theme` enum + `config/themes.toml`;
+  `test_models.py::test_theme_taxonomy_is_exactly_five_themes`.
+- [x] One-page note written, **≤250 words** — `test_validate.py::test_the_word_limit_boundary`
+  (250 passes, 251 fails); live note 223 words, figures included.
+- [x] Note contains top **3** themes — `PulseNote` cardinality (schema); `test_golden.py`.
+- [x] Note contains **3** verbatim user quotes (unaltered wording, no PII) — substring check
+  in `validate.py`, `test_validate.py` paraphrase rejections; provenance from the source
+  review; PII rescan before publish.
+- [x] Note contains **3** concrete action ideas tied to the themes — `PulseNote`
+  cardinality + action-grounding check (`test_validate.py`).
+- [x] Note published to a **Google Doc** via MCP — live: appended to the standing doc
+  through `docs_append_content` (`09_published.json`); re-run skipped. `test_publish.py`,
+  `test_golden.py` against the stub.
+- [x] **Gmail draft** created via MCP, containing the note or a link to it — live: draft
+  with the full note and the doc link through `gmail_create_draft`; in Drafts, nothing sent.
+  The agent refuses to bind any send tool; `ENABLE_GMAIL_SEND=false` on the server.
+- [x] No PII in any artifact — scrubbed at stage 3 before any model call
+  (`test_scrub.py`); the one unscrubbed artifact, `01_raw.json`, is deleted after a
+  successful run (O6); no identity fields in any schema.
+- [x] No direct Google REST/OAuth code used as the primary integration path — all Google
+  access goes through the MCP server (`src/pulse/mcp/`); the agent holds only a bearer
+  token for that server.
+- [x] No Google SDK in this repo's dependency tree — `test_no_google_sdk.py` (pyproject,
+  installed tree, and imports).
 
 ---
 
@@ -155,35 +176,21 @@ Consequences for *this* repo's scope:
 | **MCP ownership** | Servers built in a separate project; this repo is the client (D8) |
 | **Store scope** | Play Store only; Apple App Store deferred (D10, §2 scope note) |
 
-### Still open
+### Resolved since
 
-- **Export mechanism.** "Public review exports only" — which concrete Play Store export path
-  satisfies this (e.g. a provided CSV/JSON dataset, Play Console export, a public review feed)?
-  Note there is no official public export for a non-owner of the Groww app; this tension is real
-  and unresolved. **This is now the main unresolved input question.**
-- **Recipient.** Which address or alias receives the Gmail draft?
-- **Contract sign-off.** Is `pulse-mcp/1` (architecture.md §11.2) accepted by the servers project?
-  This is the only cross-project item that blocks work here.
+| Question | Resolution |
+| --- | --- |
+| **Export mechanism** | `pulse fetch` writes the export (architecture.md O1, 2026-10-12). Knowingly in tension with "no ToS-violating automation"; a licensed provider is the swap for commercial use |
+| **Recipient** | Configured as `PULSE_RECIPIENT` (2026-10-19) |
+| **Contract sign-off** | Superseded: the deployed server has its own interface, and the agent adapted to it (D-2, contract `google-workspace-mcp-0.1.json`) |
 
-Full lists: architecture.md §20 (agent-side O1–O6, cross-project X1–X5).
+Nothing from this brief is open. Open product items, if any, are in project-context.md.
 
 ---
 
 ## 10. Current Project State
 
-As of 2026-10-09, the repository contains only this documentation:
-
-```text
-agent-mcp/
-└── docs/
-    ├── problemStatement.txt      # original brief (source of truth)
-    ├── problemStatement.md       # this file — context and requirements
-    ├── architecture.md           # agent design, incl. the MCP tool contract
-    └── implementation-plan.md    # phase-by-phase build plan with task IDs
-```
-
-No code, dependencies, or MCP configuration exist yet. Not yet a git repository.
-
-The companion MCP servers project does not exist yet either. Per architecture.md §21, phases 0–4
-and 6 of this repo proceed without it, developing against a stub server generated from the
-contract; only phase 5 (live integration) requires it.
+As of 2026-10-19 the agent is built and running live: it publishes to the standing Google
+Doc and creates Gmail drafts through the deployed `google-workspace-mcp` server, and every
+§8 item is met. See [project-context.md](project-context.md) for status and
+[runbook.md](runbook.md) for weekly operation.
