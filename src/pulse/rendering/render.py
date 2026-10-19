@@ -28,7 +28,7 @@ THEME_LABELS: dict[Theme, str] = {
     Theme.CHARGES_SUPPORT: "Charges & Support",
 }
 
-DIRECTION_MARKS = {"up": "\u25b2", "down": "\u25bc", "flat": "-"}
+DIRECTION_MARKS = {"up": "\u25b2", "down": "\u25bc", "flat": "\u2192"}
 
 
 def theme_label(theme: Theme) -> str:
