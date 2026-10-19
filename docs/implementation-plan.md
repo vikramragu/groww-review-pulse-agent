@@ -408,15 +408,18 @@ filter**, so the pipeline has to apply its own.
 
 Every week stays far above the 20-review floor (P3-T5), so the stricter rule costs no weeks.
 
+Review texts quoted in this section are invented look-alikes of what the real corpus
+contained; real reviews are never committed.
+
 **Gaps found in the code on 2026-10-15** (each one became a task below; all now fixed):
 
 1. **Off-by-one.** `word_count(text) < min_words` with `min_words = 8` *keeps* 8-word reviews,
    which is "at least 8", not "more than 8". 215 reviews depend on this.
-2. **Emoji count as words.** `word_count` splits on whitespace, so `"if some wonderful app
-   application and thank you 🙏"` has 9 tokens and passes, though it has only 8 words. 191 kept
+2. **Emoji count as words.** `word_count` splits on whitespace, so `"really great app for new
+   investors thank you 🙏"` has 9 tokens and passes, though it has only 8 words. 191 kept
    reviews contain emoji.
 3. **Romanized Hindi is kept on purpose.** `MAX_NON_LATIN_RATIO` catches Devanagari but not
-   `"Isme bond ka monthly payout correct ni show karta hai"`. About **149 of the 1,945** kept
+   `"Yaha fund ka daily NAV sahi nahi dikhta hai"`. About **149 of the 1,945** kept
    reviews look like Hinglish. The code comment argues for keeping them. The 2026-10-15
    decision overrides that comment: they are not English and they are removed.
 
@@ -445,7 +448,7 @@ stayed in scratch and were not committed.
 | Sample | Result |
 | --- | --- |
 | 50 reviews the first lexicon dropped | 50/50 genuinely Hindi/Hinglish: **no English review dropped** |
-| 50 reviews the first lexicon kept | 3 clearly non-English, e.g. `"do ki jyada … ke liye the"`, where `do` and `the` read as English markers |
+| 50 reviews the first lexicon kept | 3 clearly non-English, e.g. `"do din se … ke liye the"`, where `do` and `the` read as English markers |
 | 9 reviews added by the widened lexicon | all Hinglish or code-mixed (plus one gibberish string); none English |
 | 50 kept after widening | 2 non-English (~4%), both spelling `hai` as `he`, which cannot be listed because `he` is English |
 
@@ -485,7 +488,7 @@ meant no batch was paid for twice):
 
 - **Zero** batch retries, failures, or reconciliation anomalies across all 43 batches.
 - **Unclassified 21.5% is genuine, not model failure**: mean rating 4.01, and a sample is
-  generic praise with no topic ("very nice app", "Trusted app for real ones"). The word
+  generic praise with no topic ("good app", "easy to use and trusted"). The word
   floor keeps long reviews, not on-topic ones.
 - **Cross-batch disagreement is unmeasurable here**: deduplication left no repeated text,
   so the ~5% noise estimate from P2-T10 stands unconfirmed.

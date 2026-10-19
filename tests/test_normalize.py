@@ -514,7 +514,7 @@ def test_the_default_rule_is_more_than_eight_words() -> None:
 
 def test_emoji_cannot_carry_a_review_over_the_floor() -> None:
     """Eight real words plus an emoji is still eight words."""
-    kept, report = substantive(["if some wonderful app application and thank you 🙏"])
+    kept, report = substantive(["really great app for new investors thank you 🙏"])
     assert kept == []
     assert report.dropped == {"fewer than 9 words": 1}
 
@@ -586,7 +586,7 @@ def test_hinglish_in_latin_script_is_dropped() -> None:
         "ye app bahut acha hai mujhe koi problem nahi hui abhi tak",
         "chart open hone mein bahut time lagta hai, please fix karo",
         # "do" and "the" are Hindi words too; the dominance rule still catches this.
-        "do ki jyada katte hain pata nahin kis baat ke liye the",
+        "do din se paise katte hain pata nahin kis cheez ke liye the",
     ],
 )
 def test_romanized_hindi_is_detected(text: str) -> None:
