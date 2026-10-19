@@ -1,108 +1,8 @@
 [
   {
-    "confidence": 0.96,
-    "review_id": "0207682b36f30b77",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "630652c63bcd94b0",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.94,
-    "review_id": "4e8c3e092da368a4",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.93,
-    "review_id": "780e53f24ff7e0f1",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "d61bffbfbb08e6c6",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "7d621447bfa17493",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.94,
-    "review_id": "be1eedf8e5a8abb8",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "7aaad67c83d5aa21",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "fd586a1240687369",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "c838db44e6d2e6a5",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "aa3bc8ebf0761745",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "09ea5dd5aeea2db1",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.88,
-    "review_id": "8282ec860e87bd9c",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "531034865a8fd350",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.94,
-    "review_id": "cfb9278335611b10",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "4bbc077383d11ee7",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "b743bcec7aa584d9",
-    "theme": "charges_support"
-  },
-  {
     "confidence": 0.88,
     "review_id": "ddb592b834a5b8c9",
     "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "c230a26758183cb7",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "cf64701775139e38",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "6a0fce630f63c2d5",
-    "theme": "onboarding_kyc"
   },
   {
     "confidence": 0.97,
@@ -111,7 +11,22 @@
   },
   {
     "confidence": 0.97,
-    "review_id": "e13ff8a777c91277",
+    "review_id": "3b6c66fc0bf9c657",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "7aaad67c83d5aa21",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "ace6d52134c023ce",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "ace3b82bc9f2fc43",
     "theme": "app_reliability"
   },
   {
@@ -120,34 +35,49 @@
     "theme": "orders_execution"
   },
   {
-    "confidence": 0.4,
-    "review_id": "fc693754a0a987c0",
-    "theme": null
+    "confidence": 0.98,
+    "review_id": "84cf28f3d36e9877",
+    "theme": "app_reliability"
   },
   {
-    "confidence": 0.94,
-    "review_id": "3596b9b192d85ee9",
+    "confidence": 0.85,
+    "review_id": "8d7ef419affc98d2",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.98,
+    "review_id": "3799d096ecc42c34",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "2111c00603dc5490",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "58df60e0c4906255",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "43b62559b3fa963a",
     "theme": "charges_support"
   },
   {
-    "confidence": 0.95,
-    "review_id": "d1d43c216cf90120",
-    "theme": "onboarding_kyc"
+    "confidence": 0.96,
+    "review_id": "29b693602896a583",
+    "theme": "app_reliability"
   },
   {
-    "confidence": 0.93,
-    "review_id": "8199d8304e194d72",
-    "theme": "onboarding_kyc"
+    "confidence": 0.97,
+    "review_id": "93bf865777fd3030",
+    "theme": "orders_execution"
   },
   {
-    "confidence": 0.95,
-    "review_id": "9bf249e0ab96cef2",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.93,
-    "review_id": "64900c0b118fac1c",
-    "theme": "onboarding_kyc"
+    "confidence": 0.96,
+    "review_id": "83d2cb97a8dd697d",
+    "theme": "payments_withdrawals"
   },
   {
     "confidence": 0.96,
@@ -155,9 +85,369 @@
     "theme": "app_reliability"
   },
   {
+    "confidence": 0.9,
+    "review_id": "d7af130c77ca6fe7",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "1d919f37eabab037",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "5ebab25a88903a79",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "16d6bb30fd06a5b1",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.94,
+    "review_id": "30422753a8e9176c",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.97,
+    "review_id": "9894b7398f83c51b",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.95,
+    "review_id": "f2b1831a1932a0e6",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.95,
+    "review_id": "61e1b6625304d46d",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.94,
+    "review_id": "be1eedf8e5a8abb8",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "6a0fce630f63c2d5",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "05c1ff17e261bb8b",
+    "theme": "orders_execution"
+  },
+  {
+    "confidence": 0.98,
+    "review_id": "78996d88a446c603",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.93,
+    "review_id": "64900c0b118fac1c",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "c838db44e6d2e6a5",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "1ac7616785a1c1c9",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.97,
+    "review_id": "d61bffbfbb08e6c6",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "de77c4f46dd94670",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.95,
+    "review_id": "c475eec44eb92008",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "180d70f67b8fa8bb",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "99d59fc50f3b44b7",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "12b2c659e0fa8480",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "aa3bc8ebf0761745",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "becd2eaabdbb798e",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.95,
+    "review_id": "f48ca84f10adf762",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.97,
+    "review_id": "8ef26690a1eb45d5",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.92,
+    "review_id": "c6404c78bf99c33a",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "86cfdb36ce079322",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "8cdaa1e17377f5fd",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "9a0ec2cf71d1dd5d",
+    "theme": "orders_execution"
+  },
+  {
+    "confidence": 0.97,
+    "review_id": "fd586a1240687369",
+    "theme": "orders_execution"
+  },
+  {
     "confidence": 0.96,
     "review_id": "1a2d73eaa36ec0b3",
     "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.94,
+    "review_id": "4e8c3e092da368a4",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "171921fad7a8c112",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "c7d45408b51cb719",
+    "theme": "orders_execution"
+  },
+  {
+    "confidence": 0.95,
+    "review_id": "dafa36b29deef5cb",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "1fcfb651e8fb8232",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.93,
+    "review_id": "ca2f7c1063423737",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "a43d597b85d24aac",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.94,
+    "review_id": "72f1aa3f65f86854",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.97,
+    "review_id": "dbc345ed2e6d4e0c",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.95,
+    "review_id": "d1d43c216cf90120",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "d4efb7876c64ba36",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.95,
+    "review_id": "256ba39980f6cf9c",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.94,
+    "review_id": "296691a62df9be35",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "1588a8b482692846",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "615669b1ec1bcce3",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "a2d71604025caff5",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "c5f9c36ec1d3d431",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.88,
+    "review_id": "8282ec860e87bd9c",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "d794e8d9236e3491",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.97,
+    "review_id": "d2e978e09a5bcb65",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "f628f6ac07a85a48",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.97,
+    "review_id": "317f35c1e3ac3079",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "e17c23480126c31f",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "462a9787390d00cc",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.98,
+    "review_id": "2208eeb9d9e092e0",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.98,
+    "review_id": "09ea5dd5aeea2db1",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.8,
+    "review_id": "ffa6925005dd2dc4",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.95,
+    "review_id": "028482b7848d948b",
+    "theme": "orders_execution"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "8d0e1da21d000689",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.97,
+    "review_id": "e13ff8a777c91277",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "9d87f921ea557d05",
+    "theme": "orders_execution"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "9e371552f3cd10d1",
+    "theme": "orders_execution"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "6c7f211733444081",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "a186f1c4fd0e13be",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "65afdf0c555327f3",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.94,
+    "review_id": "26fd15b038769c4c",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "47cc47b3fc077355",
+    "theme": "orders_execution"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "7b5297eeddca5b0e",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "37c9b887adf31627",
+    "theme": "app_reliability"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "463798f60f05a3f7",
+    "theme": "orders_execution"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "53acb9146ed266f6",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.98,
+    "review_id": "8713b4d6179d9329",
+    "theme": "app_reliability"
   },
   {
     "confidence": 0.95,
@@ -170,239 +460,14 @@
     "theme": "charges_support"
   },
   {
-    "confidence": 0.92,
-    "review_id": "c6404c78bf99c33a",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "83d2cb97a8dd697d",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.94,
-    "review_id": "682fcf76a54bb215",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "edd4a4e1ba944e86",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "f48ca84f10adf762",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "273aaf31862e8949",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "191a32e766fdd6bf",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.85,
-    "review_id": "8d7ef419affc98d2",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "53acb9146ed266f6",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "61e1b6625304d46d",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "a43d597b85d24aac",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "dbc345ed2e6d4e0c",
-    "theme": "payments_withdrawals"
-  },
-  {
     "confidence": 0.98,
     "review_id": "3752ca5c91ccf728",
     "theme": "payments_withdrawals"
   },
   {
-    "confidence": 0.99,
-    "review_id": "110439385964c717",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "58df60e0c4906255",
-    "theme": "app_reliability"
-  },
-  {
     "confidence": 0.96,
-    "review_id": "9e371552f3cd10d1",
+    "review_id": "beaf38eaa16affdd",
     "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "1ac7616785a1c1c9",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "c0263005f4e3d1f4",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "de77c4f46dd94670",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "877f95b635073f12",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.2,
-    "review_id": "3cc9178ee7f7823e",
-    "theme": null
-  },
-  {
-    "confidence": 0.94,
-    "review_id": "72f1aa3f65f86854",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.1,
-    "review_id": "07ea62935e08792a",
-    "theme": null
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "acb2852101037220",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "58dbef9d8ca704bf",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "2208eeb9d9e092e0",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "65afdf0c555327f3",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "ea43fd835a6ea73e",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "615669b1ec1bcce3",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "256ba39980f6cf9c",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "d2e978e09a5bcb65",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.94,
-    "review_id": "30422753a8e9176c",
-    "theme": "charges_support"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "e17c23480126c31f",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "3799d096ecc42c34",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "0b9abb0cba963296",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "a186f1c4fd0e13be",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "aa1cbe40bb86c0a0",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "84cf28f3d36e9877",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "028482b7848d948b",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "8713b4d6179d9329",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "47cc47b3fc077355",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "93bf865777fd3030",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "86cfdb36ce079322",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "463798f60f05a3f7",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "462a9787390d00cc",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.98,
-    "review_id": "0c949ba052484347",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "f72bf1e558f12b56",
-    "theme": "payments_withdrawals"
   },
   {
     "confidence": 0.9,
@@ -411,18 +476,18 @@
   },
   {
     "confidence": 0.9,
-    "review_id": "2111c00603dc5490",
+    "review_id": "e04797e9f1f9289b",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "877f95b635073f12",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "84abcd712ca111ba",
     "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "1fcfb651e8fb8232",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "1d919f37eabab037",
-    "theme": "charges_support"
   },
   {
     "confidence": 0.8,
@@ -430,19 +495,19 @@
     "theme": "charges_support"
   },
   {
-    "confidence": 0.6,
-    "review_id": "ac8722e7dcc8ce45",
-    "theme": null
+    "confidence": 0.98,
+    "review_id": "ea43fd835a6ea73e",
+    "theme": "orders_execution"
   },
   {
-    "confidence": 0.8,
-    "review_id": "ffa6925005dd2dc4",
-    "theme": "charges_support"
+    "confidence": 0.94,
+    "review_id": "2de8568787745663",
+    "theme": "payments_withdrawals"
   },
   {
-    "confidence": 0.9,
-    "review_id": "6c7f211733444081",
-    "theme": "app_reliability"
+    "confidence": 0.96,
+    "review_id": "531034865a8fd350",
+    "theme": "orders_execution"
   },
   {
     "confidence": 0.9,
@@ -451,17 +516,17 @@
   },
   {
     "confidence": 0.9,
-    "review_id": "180d70f67b8fa8bb",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "84abcd712ca111ba",
+    "review_id": "faea7c160adcb386",
     "theme": "app_reliability"
   },
   {
-    "confidence": 0.9,
-    "review_id": "e83c3d3bde220ee6",
+    "confidence": 0.97,
+    "review_id": "59031388716be33b",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.93,
+    "review_id": "4375af94834a31ed",
     "theme": "payments_withdrawals"
   },
   {
@@ -470,8 +535,13 @@
     "theme": "app_reliability"
   },
   {
-    "confidence": 0.9,
-    "review_id": "becd2eaabdbb798e",
+    "confidence": 0.96,
+    "review_id": "b743bcec7aa584d9",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.92,
+    "review_id": "19e25a93ca865e7b",
     "theme": "app_reliability"
   },
   {
@@ -480,8 +550,8 @@
     "theme": "payments_withdrawals"
   },
   {
-    "confidence": 0.9,
-    "review_id": "171921fad7a8c112",
+    "confidence": 0.94,
+    "review_id": "cfb9278335611b10",
     "theme": "charges_support"
   },
   {
@@ -490,9 +560,9 @@
     "theme": "charges_support"
   },
   {
-    "confidence": 0.9,
-    "review_id": "faea7c160adcb386",
-    "theme": "app_reliability"
+    "confidence": 0.94,
+    "review_id": "2f080666e17b529b",
+    "theme": "orders_execution"
   },
   {
     "confidence": 0.7,
@@ -500,109 +570,54 @@
     "theme": "app_reliability"
   },
   {
-    "confidence": 0.9,
-    "review_id": "1588a8b482692846",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "8cdaa1e17377f5fd",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "37c9b887adf31627",
+    "confidence": 0.96,
+    "review_id": "dc8d61860fa7940e",
     "theme": "app_reliability"
   },
   {
-    "confidence": 0.9,
-    "review_id": "c7d45408b51cb719",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "05c1ff17e261bb8b",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "3b1bc4ca2d1177df",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "d7af130c77ca6fe7",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "9d87f921ea557d05",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "ace6d52134c023ce",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "43b62559b3fa963a",
+    "confidence": 0.94,
+    "review_id": "682fcf76a54bb215",
     "theme": "charges_support"
   },
   {
-    "confidence": 0.9,
-    "review_id": "e04797e9f1f9289b",
+    "confidence": 0.97,
+    "review_id": "0b9abb0cba963296",
     "theme": "onboarding_kyc"
   },
   {
-    "confidence": 0.9,
-    "review_id": "9a0ec2cf71d1dd5d",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "f628f6ac07a85a48",
+    "confidence": 0.98,
+    "review_id": "7d621447bfa17493",
     "theme": "app_reliability"
   },
   {
-    "confidence": 0.9,
-    "review_id": "d4efb7876c64ba36",
+    "confidence": 0.98,
+    "review_id": "0c949ba052484347",
     "theme": "app_reliability"
   },
   {
-    "confidence": 0.9,
-    "review_id": "8d0e1da21d000689",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "ace3b82bc9f2fc43",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "16d6bb30fd06a5b1",
+    "confidence": 0.94,
+    "review_id": "3596b9b192d85ee9",
     "theme": "charges_support"
   },
   {
-    "confidence": 0.9,
-    "review_id": "8d9171560bd1d65e",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "680d55d09f949131",
-    "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.9,
-    "review_id": "c5f9c36ec1d3d431",
+    "confidence": 0.95,
+    "review_id": "630652c63bcd94b0",
     "theme": "onboarding_kyc"
   },
   {
     "confidence": 0.96,
-    "review_id": "29b693602896a583",
-    "theme": "app_reliability"
+    "review_id": "58dbef9d8ca704bf",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "110439385964c717",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.98,
+    "review_id": "c0263005f4e3d1f4",
+    "theme": "onboarding_kyc"
   },
   {
     "confidence": 0.97,
@@ -610,9 +625,9 @@
     "theme": "payments_withdrawals"
   },
   {
-    "confidence": 0.96,
-    "review_id": "d794e8d9236e3491",
-    "theme": "payments_withdrawals"
+    "confidence": 0.95,
+    "review_id": "4a674170d356b667",
+    "theme": "charges_support"
   },
   {
     "confidence": 0.97,
@@ -635,18 +650,13 @@
     "theme": "charges_support"
   },
   {
-    "confidence": 0.95,
-    "review_id": "f2b1831a1932a0e6",
-    "theme": "payments_withdrawals"
-  },
-  {
     "confidence": 0.88,
     "review_id": "a76dd839fc177cd7",
     "theme": "app_reliability"
   },
   {
-    "confidence": 0.96,
-    "review_id": "12b2c659e0fa8480",
+    "confidence": 0.9,
+    "review_id": "f72bf1e558f12b56",
     "theme": "payments_withdrawals"
   },
   {
@@ -661,13 +671,13 @@
   },
   {
     "confidence": 0.94,
-    "review_id": "26fd15b038769c4c",
-    "theme": "payments_withdrawals"
+    "review_id": "916fb0e9690333cf",
+    "theme": "orders_execution"
   },
   {
-    "confidence": 0.94,
-    "review_id": "296691a62df9be35",
-    "theme": "charges_support"
+    "confidence": 0.96,
+    "review_id": "aa1cbe40bb86c0a0",
+    "theme": "orders_execution"
   },
   {
     "confidence": 0.97,
@@ -675,8 +685,8 @@
     "theme": "onboarding_kyc"
   },
   {
-    "confidence": 0.96,
-    "review_id": "f58d3b145e053d58",
+    "confidence": 0.95,
+    "review_id": "94f857f59fb3abeb",
     "theme": "app_reliability"
   },
   {
@@ -685,9 +695,9 @@
     "theme": "orders_execution"
   },
   {
-    "confidence": 0.95,
-    "review_id": "4a674170d356b667",
-    "theme": "charges_support"
+    "confidence": 0.98,
+    "review_id": "c230a26758183cb7",
+    "theme": "app_reliability"
   },
   {
     "confidence": 0.89,
@@ -700,8 +710,13 @@
     "theme": "orders_execution"
   },
   {
+    "confidence": 0.2,
+    "review_id": "3cc9178ee7f7823e",
+    "theme": null
+  },
+  {
     "confidence": 0.97,
-    "review_id": "9894b7398f83c51b",
+    "review_id": "edd4a4e1ba944e86",
     "theme": "onboarding_kyc"
   },
   {
@@ -725,24 +740,14 @@
     "theme": "charges_support"
   },
   {
-    "confidence": 0.94,
-    "review_id": "2de8568787745663",
-    "theme": "payments_withdrawals"
-  },
-  {
     "confidence": 0.92,
     "review_id": "61a1b1bc8bb99b99",
     "theme": "charges_support"
   },
   {
-    "confidence": 0.96,
-    "review_id": "5ebab25a88903a79",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "a19973bccd3fcab7",
-    "theme": "payments_withdrawals"
+    "confidence": 0.95,
+    "review_id": "4bbc077383d11ee7",
+    "theme": "orders_execution"
   },
   {
     "confidence": 0.96,
@@ -750,23 +755,18 @@
     "theme": "charges_support"
   },
   {
-    "confidence": 0.97,
-    "review_id": "317f35c1e3ac3079",
+    "confidence": 0.96,
+    "review_id": "aa318d7185882d57",
     "theme": "onboarding_kyc"
   },
   {
-    "confidence": 0.96,
-    "review_id": "a2d71604025caff5",
-    "theme": "app_reliability"
+    "confidence": 0.97,
+    "review_id": "acb2852101037220",
+    "theme": "orders_execution"
   },
   {
-    "confidence": 0.95,
-    "review_id": "e5b2714d60a90ef0",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "0f98134df1fd28f2",
+    "confidence": 0.9,
+    "review_id": "8d9171560bd1d65e",
     "theme": "payments_withdrawals"
   },
   {
@@ -775,19 +775,14 @@
     "theme": "app_reliability"
   },
   {
-    "confidence": 0.96,
-    "review_id": "beaf38eaa16affdd",
-    "theme": "orders_execution"
+    "confidence": 0.97,
+    "review_id": "273aaf31862e8949",
+    "theme": "app_reliability"
   },
   {
-    "confidence": 0.98,
-    "review_id": "78996d88a446c603",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.2,
-    "review_id": "be94bbca8284abc0",
-    "theme": null
+    "confidence": 0.99,
+    "review_id": "191a32e766fdd6bf",
+    "theme": "payments_withdrawals"
   },
   {
     "confidence": 0.97,
@@ -797,11 +792,6 @@
   {
     "confidence": 0.95,
     "review_id": "c01826cb29ce70ab",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "c475eec44eb92008",
     "theme": "app_reliability"
   },
   {
@@ -820,9 +810,9 @@
     "theme": "app_reliability"
   },
   {
-    "confidence": 0.92,
-    "review_id": "19e25a93ca865e7b",
-    "theme": "app_reliability"
+    "confidence": 0.93,
+    "review_id": "8199d8304e194d72",
+    "theme": "onboarding_kyc"
   },
   {
     "confidence": 0.93,
@@ -836,13 +826,18 @@
   },
   {
     "confidence": 0.96,
-    "review_id": "aa318d7185882d57",
-    "theme": "onboarding_kyc"
+    "review_id": "0f98134df1fd28f2",
+    "theme": "payments_withdrawals"
   },
   {
     "confidence": 0.95,
     "review_id": "d54aaf404ca98885",
     "theme": "charges_support"
+  },
+  {
+    "confidence": 0.95,
+    "review_id": "cf64701775139e38",
+    "theme": "onboarding_kyc"
   },
   {
     "confidence": 0.94,
@@ -880,6 +875,11 @@
     "theme": "charges_support"
   },
   {
+    "confidence": 0.96,
+    "review_id": "f58d3b145e053d58",
+    "theme": "app_reliability"
+  },
+  {
     "confidence": 0.94,
     "review_id": "43ea6d89450ee7ff",
     "theme": "payments_withdrawals"
@@ -910,13 +910,8 @@
     "theme": "payments_withdrawals"
   },
   {
-    "confidence": 0.95,
-    "review_id": "dafa36b29deef5cb",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.94,
-    "review_id": "2f080666e17b529b",
+    "confidence": 0.9,
+    "review_id": "680d55d09f949131",
     "theme": "orders_execution"
   },
   {
@@ -930,14 +925,9 @@
     "theme": "payments_withdrawals"
   },
   {
-    "confidence": 0.93,
-    "review_id": "ca2f7c1063423737",
-    "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.93,
-    "review_id": "4375af94834a31ed",
-    "theme": "payments_withdrawals"
+    "confidence": 0.96,
+    "review_id": "0207682b36f30b77",
+    "theme": "onboarding_kyc"
   },
   {
     "confidence": 0.93,
@@ -945,14 +935,24 @@
     "theme": "payments_withdrawals"
   },
   {
-    "confidence": 0.94,
-    "review_id": "916fb0e9690333cf",
-    "theme": "orders_execution"
+    "confidence": 0.95,
+    "review_id": "c838ed6b6f9ef878",
+    "theme": "payments_withdrawals"
+  },
+  {
+    "confidence": 0.96,
+    "review_id": "fef925dffb43e94d",
+    "theme": "charges_support"
   },
   {
     "confidence": 0.95,
     "review_id": "e1fe4cb9063ea483",
     "theme": "charges_support"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "e83c3d3bde220ee6",
+    "theme": "payments_withdrawals"
   },
   {
     "confidence": 0.94,
@@ -968,11 +968,6 @@
     "confidence": 0.94,
     "review_id": "2c219c199f428943",
     "theme": "orders_execution"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "bd5b825387c785db",
-    "theme": "onboarding_kyc"
   },
   {
     "confidence": 0.92,
@@ -1030,9 +1025,9 @@
     "theme": "payments_withdrawals"
   },
   {
-    "confidence": 0.97,
-    "review_id": "3b6c66fc0bf9c657",
-    "theme": "onboarding_kyc"
+    "confidence": 0.96,
+    "review_id": "476d9ed04798ebc9",
+    "theme": "charges_support"
   },
   {
     "confidence": 0.96,
@@ -1043,11 +1038,6 @@
     "confidence": 0.98,
     "review_id": "e6bd08d4a19b5137",
     "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.99,
-    "review_id": "33c52e30c04386c9",
-    "theme": "orders_execution"
   },
   {
     "confidence": 0.99,
@@ -1065,8 +1055,18 @@
     "theme": "onboarding_kyc"
   },
   {
+    "confidence": 0.94,
+    "review_id": "99cd8b3bb947d1a0",
+    "theme": "app_reliability"
+  },
+  {
     "confidence": 0.99,
     "review_id": "5392f36db3830cc9",
+    "theme": "orders_execution"
+  },
+  {
+    "confidence": 0.9,
+    "review_id": "3b1bc4ca2d1177df",
     "theme": "orders_execution"
   },
   {
@@ -1125,54 +1125,39 @@
     "theme": "onboarding_kyc"
   },
   {
-    "confidence": 0.96,
-    "review_id": "7b5297eeddca5b0e",
-    "theme": "payments_withdrawals"
+    "confidence": 0.95,
+    "review_id": "bd5b825387c785db",
+    "theme": "onboarding_kyc"
+  },
+  {
+    "confidence": 0.93,
+    "review_id": "780e53f24ff7e0f1",
+    "theme": "charges_support"
+  },
+  {
+    "confidence": 0.99,
+    "review_id": "33c52e30c04386c9",
+    "theme": "orders_execution"
   },
   {
     "confidence": 0.95,
-    "review_id": "94f857f59fb3abeb",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "476d9ed04798ebc9",
+    "review_id": "9bf249e0ab96cef2",
     "theme": "charges_support"
   },
   {
     "confidence": 0.96,
-    "review_id": "dc8d61860fa7940e",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.95,
-    "review_id": "c838ed6b6f9ef878",
+    "review_id": "a19973bccd3fcab7",
     "theme": "payments_withdrawals"
-  },
-  {
-    "confidence": 0.94,
-    "review_id": "99cd8b3bb947d1a0",
-    "theme": "app_reliability"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "8ef26690a1eb45d5",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.97,
-    "review_id": "59031388716be33b",
-    "theme": "onboarding_kyc"
-  },
-  {
-    "confidence": 0.96,
-    "review_id": "fef925dffb43e94d",
-    "theme": "charges_support"
   },
   {
     "confidence": 0.97,
     "review_id": "25ff3e2250b0b634",
     "theme": "charges_support"
+  },
+  {
+    "confidence": 0.98,
+    "review_id": "0e04de85cd2fa873",
+    "theme": "app_reliability"
   },
   {
     "confidence": 0.98,

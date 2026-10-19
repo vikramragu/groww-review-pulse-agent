@@ -1,7 +1,8 @@
 """The committed classification artifact (P2-T10).
 
 `tests/fixtures/classified_golden.json` holds the labels a real model produced for the
-fixture corpus on 2026-10-11 (`openai/gpt-oss-120b`, taxonomy v1). It exists so Phases 3
+substance-filtered fixture corpus (`openai/gpt-oss-120b`, taxonomy v1): 236 labelled on
+2026-10-11, plus the 2 rows P2-T18 added, labelled on 2026-10-15. It exists so Phases 3
 and 6 can be tested offline: the note pipeline can be exercised end to end without
 spending tokens or depending on a model being reachable.
 
@@ -19,7 +20,7 @@ import pytest
 
 from pulse.analysis.scrub import scrub_reviews
 from pulse.ingest.base import build_source
-from pulse.ingest.normalize import filter_to_window, normalize
+from pulse.ingest.normalize import filter_substantive, filter_to_window, normalize
 from pulse.models import ClassifiedReview, Theme
 
 GOLDEN = Path("tests/fixtures/classified_golden.json")
@@ -37,10 +38,11 @@ def golden() -> list[ClassifiedReview]:
 
 @pytest.fixture(scope="module")
 def corpus_ids() -> list[str]:
-    """Re-derive the scrubbed corpus the golden labels were produced from."""
+    """Re-derive the corpus stage 4 classifies: windowed, substance-filtered, scrubbed."""
     raw, _ = build_source("file_drop", path=FIXTURE).load()
     reviews, _ = normalize(raw)
     reviews, _ = filter_to_window(reviews, FIXTURE_WEEK, 12)
+    reviews, _ = filter_substantive(reviews)
     reviews, _ = scrub_reviews(reviews)
     return [review.review_id for review in reviews]
 

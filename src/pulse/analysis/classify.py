@@ -415,22 +415,25 @@ def classify_reviews(
             },
         )
 
-        for batch in batches:
-            batch_result = _classify_batch(
-                batch,
-                llm=llm,
-                system=system,
-                schema=schema,
-                max_tokens=llm_config.classify_max_tokens,
-                min_confidence=settings.pulse.thresholds.min_confidence,
-                report=report,
-                reasoning_effort=llm_config.classify_reasoning_effort,
-            )
-            resolved.update(batch_result)
-            for classified in batch_result.values():
-                cache.put(classified)
-
-        cache.save()
+        # Saved in `finally` so a transport failure on batch 30 of 43 keeps the 29 batches
+        # already paid for; the re-run then sends only what is left.
+        try:
+            for batch in batches:
+                batch_result = _classify_batch(
+                    batch,
+                    llm=llm,
+                    system=system,
+                    schema=schema,
+                    max_tokens=llm_config.classify_max_tokens,
+                    min_confidence=settings.pulse.thresholds.min_confidence,
+                    report=report,
+                    reasoning_effort=llm_config.classify_reasoning_effort,
+                )
+                resolved.update(batch_result)
+                for classified in batch_result.values():
+                    cache.put(classified)
+        finally:
+            cache.save()
 
     ordered = [resolved[review.review_id] for review in reviews]
     for classified in ordered:

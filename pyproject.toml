@@ -15,7 +15,11 @@ license = { text = "Proprietary" }
 dependencies = [
     "pydantic>=2.9",
     "groq>=0.11",
-    "mcp>=1.2",
+    # The client and stub are written against the 2.x SDK (snake_case result fields,
+    # handler-based low-level Server); 1.x is not API-compatible.
+    "mcp>=2.3,<3",
+    # Validates every server reply against contract/pulse-mcp-1.json (architecture §18).
+    "jsonschema>=4.20",
     "typer>=0.12",
 ]
 
@@ -24,6 +28,9 @@ dependencies = [
 # dependency so the default install carries no unused client; `LlmPort` makes adding an
 # `AnthropicLlm` a contained change if the provider is switched back.
 anthropic = ["anthropic>=1.0"]
+# Used only by `pulse fetch`, never by the pipeline. Optional so the default install
+# contains no code capable of reaching the network (see ingest/play_store.py).
+scraper = ["google-play-scraper>=1.2.7"]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.24",
@@ -61,5 +68,5 @@ strict = true
 warn_unreachable = true
 # Third-party packages without bundled type information.
 [[tool.mypy.overrides]]
-module = ["mcp.*"]
+module = ["mcp.*", "google_play_scraper.*", "jsonschema.*"]
 ignore_missing_imports = true

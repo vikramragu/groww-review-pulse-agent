@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import hashlib
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from functools import lru_cache
 from typing import Any
 
 from pulse import logging as pulse_logging
@@ -271,3 +273,181 @@ def validate_window(
             f"Import a wider export, or lower PULSE_MIN_WINDOW_WEEKS deliberately."
         )
     return present
+
+
+# --------------------------------------------------------------------------------------
+# Substance filtering
+#
+# A third of real Groww reviews are a single word ("good", "ok", "nice") and two thirds
+# are three words or fewer. Those carry no theme, so left in they would land in
+# `unclassified` and swell the denominator every theme share is measured against -- making
+# "payments was 25% of the week" a statement mostly about noise.
+#
+# Applied *after* windowing, so both counts are available: how many reviews the week
+# actually received, and how many of them say anything. The note reports both, because
+# these filters are sample selection and the shares are not population shares.
+# --------------------------------------------------------------------------------------
+
+#: Inclusive minimum: a review needs at least this many words. 9 implements the rule
+#: "more than 8 words" (decided 2026-10-15). Configurable -- thresholds.min_review_words.
+DEFAULT_MIN_WORDS = 9
+
+#: A review whose letters are mostly non-Latin is in a script the English classifier
+#: prompt cannot read.
+MAX_NON_LATIN_RATIO = 0.3
+
+#: Bump whenever HINDI_MARKERS or ENGLISH_MARKERS change, so a corpus-size shift between
+#: two runs can be traced to the lexicon rather than to the reviews.
+ROMANIZED_LEXICON_VERSION = 1
+
+#: Romanized-Hindi function words and very common content words. Deliberately excludes
+#: anything that is also an ordinary English word ("me", "main", "par", "to", "hi", "so",
+#: "us", "mat", "ya", "ha"), because a false hit there drops an English review.
+HINDI_MARKERS = frozenset(
+    """
+    hai hain hoon hu tha thi nahi nahin nhi nai ni ka ki ke ko se mein mai pe tak bhi toh
+    kya kyu kyun kyon kaise kab kaha kahan jab tab agar lekin magar aur kyunki mera meri
+    mere mujhe muje mujhko hum hame humein hamara aap apna apne apni tum tumhara tera teri
+    yeh ye woh wo isme isse iska iski iske uska uski uske unka kuch koi sab sabse bahut
+    bohot bhut bahot zyada jyada kam thoda accha acha achha achchha bekar bakwas badiya
+    badhiya bura ganda kar karo karna karta karte karti kare karke kiya kiye kr krne krna
+    krta krte raha rahe rahi rha rhe rhi hua hue hui hota hoti hote hoga hogi ho gaya gaye
+    gayi gya gye gyi diya diye liya liye dena lena dete lete deta leta jata jati jate
+    jaata jaate wala wale wali chahiye abhi bhai yaha yahan waha wahan sirf bilkul paisa
+    paise rupaye kaam samajh pata haan kabhi kariye kijiye karein karen baat baad pehle
+    phir fir yaar jo jis jisme jisse isko usko unko inko hamesha hamare apka aapka apke
+    aapke apki aapki wajah kitna jitna utna itna sath saath mila milta milti aata aati aa
+    dikhta dikhata dikhati lagta lagti chalta chalti wapas jaldi kyonki matlab sahi galat
+    glt thik theek mujhse humko tumko
+    """.split()  # noqa: SIM905 -- a word list reads better as prose
+)
+
+#: English function words. A review dense in these is English even if it borrows a few
+#: Hindi words ("withdrawal nahi aaya, please check this issue").
+ENGLISH_MARKERS = frozenset(
+    """
+    the a an is are was were be been being it its this that these those to of in on for
+    with and but or not no my i i'm you your me we our they their he she have has had do
+    does did very so can could will would should from at by as if all there what when why
+    how which who after before because also just only than then
+    """.split()  # noqa: SIM905 -- a word list reads better as prose
+)
+
+#: A review is romanized Hindi when at least this share of its words are Hindi markers...
+MIN_HINDI_MARKER_RATIO = 0.2
+#: ...and fewer than this share are English markers...
+MAX_ENGLISH_MARKER_RATIO = 0.15
+#: ...or when Hindi markers alone reach this share. Needed because "do" and "the" are
+#: Hindi words too, so a Hinglish review can trip the English side by accident.
+HINDI_DOMINANT_RATIO = 0.4
+
+_LATIN_WORD = re.compile(r"[a-z]+(?:'[a-z]+)?")
+
+
+@lru_cache(maxsize=4096)
+def _is_latin_letter(char: str) -> bool:
+    if char.isascii():
+        return char.isalpha()
+    return "LATIN" in unicodedata.name(char, "")
+
+
+def word_count(text: str) -> int:
+    """Whitespace-separated tokens containing at least one letter.
+
+    Emoji, "!!!" and "₹500" are not words, so they cannot carry a review over the floor.
+    """
+    return sum(1 for token in _WHITESPACE.split(text) if has_letters(token))
+
+
+def is_romanized_hindi(text: str) -> bool:
+    """True when the review is Hindi written in Latin script (Hinglish).
+
+    Two-sided on purpose: Hindi markers alone would drop English reviews that borrow a
+    word or two, so the review must also be short on English function words -- unless
+    Hindi markers dominate outright.
+    """
+    words = _LATIN_WORD.findall(text.lower())
+    if not words:
+        return False
+    hindi = sum(1 for word in words if word in HINDI_MARKERS) / len(words)
+    english = sum(1 for word in words if word in ENGLISH_MARKERS) / len(words)
+    if hindi >= HINDI_DOMINANT_RATIO:
+        return True
+    return hindi >= MIN_HINDI_MARKER_RATIO and english < MAX_ENGLISH_MARKER_RATIO
+
+
+def non_latin_ratio(text: str) -> float:
+    """Share of this text's letters that are not Latin. 0.0 when it has no letters."""
+    letters = [char for char in text if char.isalpha()]
+    if not letters:
+        return 0.0
+    return sum(1 for char in letters if not _is_latin_letter(char)) / len(letters)
+
+
+def has_letters(text: str) -> bool:
+    return any(char.isalpha() for char in text)
+
+
+@dataclass
+class SubstanceReport:
+    """Counts only. `in_window` is the denominator the note must disclose."""
+
+    in_window: int = 0
+    kept: int = 0
+    dropped: dict[str, int] = field(default_factory=dict)
+    min_words: int = DEFAULT_MIN_WORDS
+
+    def drop(self, reason: str) -> None:
+        self.dropped[reason] = self.dropped.get(reason, 0) + 1
+
+    @property
+    def total_dropped(self) -> int:
+        return sum(self.dropped.values())
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "in_window": self.in_window,
+            "kept": self.kept,
+            "kept_share": round(self.kept / self.in_window, 3) if self.in_window else 0.0,
+            "dropped": dict(sorted(self.dropped.items())),
+            "min_words": self.min_words,
+            "romanized_lexicon_version": ROMANIZED_LEXICON_VERSION,
+        }
+
+
+def filter_substantive(
+    reviews: list[Review],
+    *,
+    min_words: int = DEFAULT_MIN_WORDS,
+) -> tuple[list[Review], SubstanceReport]:
+    """Keep only reviews that can carry a theme.
+
+    Four rules, each counted separately so the cost of the filtering is visible:
+
+    * **no letters** -- emoji and punctuation only; nothing to classify.
+    * **non-Latin script** -- a language the English classifier prompt cannot read.
+    * **romanized Hindi** -- not English, even though it is in Latin script.
+    * **too few words** -- below the floor, there is no topic to find.
+    """
+    report = SubstanceReport(in_window=len(reviews), min_words=min_words)
+    kept: list[Review] = []
+
+    for review in reviews:
+        text = review.text
+        if not has_letters(text):
+            report.drop("emoji or punctuation only")
+            continue
+        if non_latin_ratio(text) > MAX_NON_LATIN_RATIO:
+            report.drop("non-Latin script")
+            continue
+        if is_romanized_hindi(text):
+            report.drop("non-English (romanized)")
+            continue
+        if word_count(text) < min_words:
+            report.drop(f"fewer than {min_words} words")
+            continue
+        kept.append(review)
+
+    report.kept = len(kept)
+    log.info("substance filter complete", extra=report.summary())
+    return kept, report

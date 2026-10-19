@@ -98,6 +98,8 @@ NEGATIVE_CASES: list[str] = [
     "Took 20 minutes to open the account end to end.",
     # Domain shorthand that resembles codes.
     "Settlement takes longer than the T+1 the app promises.",
+    # An ISO date is 8 digits; the digit backstop counts digits, not characters.
+    "My withdrawal has been stuck since 2026-10-01 with no update.",
     "Support is supposed to be 24x7 but nobody replies.",
     "SBI netbanking works but HDFC does not.",
     "App version 5.2.1 broke the portfolio screen.",

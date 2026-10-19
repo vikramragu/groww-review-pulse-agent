@@ -86,6 +86,7 @@ def draft_note(
     settings: Settings,
     iso_week: str,
     corpus_size: int,
+    corpus_total: int | None = None,
     generated_on: date | None = None,
 ) -> DraftOutcome:
     """Generate a note and regenerate until it validates or the budget runs out."""
@@ -129,7 +130,12 @@ def draft_note(
             feedback = render_retry_feedback([f"the reply was rejected: {exc}"], attempt)
             continue
 
-        markdown = render_note(note, corpus_size=corpus_size, generated_on=generated_on)
+        markdown = render_note(
+            note,
+            corpus_size=corpus_size,
+            corpus_total=corpus_total,
+            generated_on=generated_on,
+        )
         result = validate_note(
             note,
             markdown,

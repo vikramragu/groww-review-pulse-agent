@@ -17,16 +17,23 @@ from datetime import date
 import pytest
 
 from pulse.ingest.normalize import (
+    ENGLISH_MARKERS,
+    HINDI_MARKERS,
     NormalizeError,
+    SubstanceReport,
     collapse_whitespace,
+    filter_substantive,
     filter_to_window,
+    is_romanized_hindi,
     iso_week_of,
     iso_week_start,
+    non_latin_ratio,
     normalize,
     parse_submitted_on,
     review_id_for,
     validate_window,
     weeks_in_window,
+    word_count,
 )
 from pulse.models import RawReview, Review, Source
 
@@ -433,3 +440,240 @@ def test_report_counts_reconcile() -> None:
     assert report.reviews_out == len(reviews) == 1
     assert report.duplicates_removed == 1
     assert sum(report.dropped.values()) == 2
+
+
+# --------------------------------------------------------------------------------------
+# Substance filtering
+#
+# A third of real Groww reviews are a single word and two thirds are three or fewer. Left
+# in, they land in `unclassified` and swell the denominator every theme share is measured
+# against -- so "payments was 25% of the week" would mostly be measuring noise.
+#
+# These filters are sample selection, which is why `SubstanceReport` keeps both counts and
+# the rendered note discloses both.
+# --------------------------------------------------------------------------------------
+
+
+def substantive(texts: list[str], **kwargs: object) -> tuple[list[str], SubstanceReport]:
+    reviews = [a_review_with(text) for text in texts]
+    kept, report = filter_substantive(reviews, **kwargs)  # type: ignore[arg-type]
+    return [r.text for r in kept], report
+
+
+def a_review_with(text: str) -> Review:
+    return Review(
+        review_id=f"{abs(hash(text)):016x}"[:16],
+        source=Source.PLAY_STORE,
+        rating=3,
+        text=text,
+        submitted_on=date(2026, 10, 7),
+        iso_week="2026-W41",
+        scrubbed=True,
+    )
+
+
+# -- word counting ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("one", 1),
+        ("one two", 2),
+        ("  spaced   out  words ", 3),
+        ("", 0),
+        ("a\nb\tc", 3),
+        ("good 👍👍 app", 2),
+        ("lost ₹500 today", 2),
+        ("!!! wow ...", 1),
+        ("T+1 settlement", 2),
+    ],
+)
+def test_word_count(text: str, expected: int) -> None:
+    """Only tokens with a letter are words, so emoji and bare numbers cannot pad a review."""
+    assert word_count(text) == expected
+
+
+# -- the word floor --------------------------------------------------------------------
+
+
+def test_reviews_below_the_word_floor_are_dropped() -> None:
+    long_enough = "withdrawal has been pending for four days with no update"
+    kept, report = substantive(["good", "ok", "very good app", long_enough])
+    assert kept == [long_enough]
+    assert report.dropped == {"fewer than 9 words": 3}
+
+
+def test_the_default_rule_is_more_than_eight_words() -> None:
+    eight = "one two three four five six seven eight"
+    nine = "one two three four five six seven eight nine"
+    kept, report = substantive([eight, nine])
+    assert kept == [nine]
+    assert report.min_words == 9
+
+
+def test_emoji_cannot_carry_a_review_over_the_floor() -> None:
+    """Eight real words plus an emoji is still eight words."""
+    kept, report = substantive(["if some wonderful app application and thank you 🙏"])
+    assert kept == []
+    assert report.dropped == {"fewer than 9 words": 1}
+
+
+def test_the_floor_is_configurable() -> None:
+    """Left configurable because the right value is a judgement about signal, not a fact."""
+    texts = ["withdrawal pending since last week"]  # 5 words
+    assert len(substantive(texts, min_words=4)[0]) == 1
+    assert len(substantive(texts, min_words=5)[0]) == 1
+    assert len(substantive(texts, min_words=8)[0]) == 0
+
+
+def test_the_four_to_seven_word_band_is_the_cost_of_a_floor_of_eight() -> None:
+    """Pinning the known trade-off rather than leaving it implicit.
+
+    "withdrawal pending since last week" is five words and clearly classifiable as
+    payments. At the configured floor of 8 it is dropped; at 5 it survives. Recorded so
+    the cost of the threshold is visible in the test suite, not only in a comment.
+    """
+    short_but_real = ["withdrawal pending since last week"]
+    assert substantive(short_but_real, min_words=5)[0] == short_but_real
+    assert substantive(short_but_real, min_words=8)[0] == []
+
+
+# -- emoji and punctuation -------------------------------------------------------------
+
+
+@pytest.mark.parametrize("text", ["👍👍👍", "!!!", "⭐⭐⭐⭐⭐", "😡😡 😡 😡 😡 😡"])
+def test_reviews_with_no_letters_are_dropped(text: str) -> None:
+    """Counted separately from the word floor: some emoji strings have many "words"."""
+    kept, report = substantive([text])
+    assert kept == []
+    assert report.dropped == {"emoji or punctuation only": 1}
+
+
+def test_emoji_alongside_real_text_is_kept() -> None:
+    kept, _ = substantive(["Withdrawal has been pending for four days 😡😡 with no update"])
+    assert len(kept) == 1
+
+
+# -- script ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "ईजी और यह एक बहुत बड़ा योगदान दिया है",
+        "আমার জানে কে যে জিজ্ঞেস করো যে প্রকাশ করস",
+    ],
+)
+def test_non_latin_script_reviews_are_dropped(text: str) -> None:
+    """The classifier prompt is English; it cannot read these."""
+    kept, report = substantive([text])
+    assert kept == []
+    assert report.dropped == {"non-Latin script": 1}
+
+
+def test_hinglish_in_latin_script_is_dropped() -> None:
+    """Decided 2026-10-15: only English reviews are classified."""
+    kept, report = substantive(["paisa nahi aaya withdrawal se bahut din ho gaye hai ab"])
+    assert kept == []
+    assert report.dropped == {"non-English (romanized)": 1}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "paisa nahi aaya withdrawal se bahut din ho gaye hai ab",
+        "ye app bahut acha hai mujhe koi problem nahi hui abhi tak",
+        "chart open hone mein bahut time lagta hai, please fix karo",
+        # "do" and "the" are Hindi words too; the dominance rule still catches this.
+        "do ki jyada katte hain pata nahin kis baat ke liye the",
+    ],
+)
+def test_romanized_hindi_is_detected(text: str) -> None:
+    assert is_romanized_hindi(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "bad luck for me, the order failed again today",
+        "I am using it since 2021 and it is the best app for mutual funds",
+        "Main screen keeps crashing when I open the portfolio tab",
+        "To be honest the app is ok but the charges are high",
+        # English that borrows one Hindi word stays English.
+        "withdrawal pending for a week, paisa still not credited to my bank account",
+        "",
+        "👍👍👍",
+    ],
+)
+def test_english_is_not_mistaken_for_romanized_hindi(text: str) -> None:
+    """The precision side: a false hit here silently drops a real English review."""
+    assert not is_romanized_hindi(text)
+
+
+def test_the_hindi_lexicon_contains_no_common_english_words() -> None:
+    assert not HINDI_MARKERS & {"me", "main", "par", "to", "hi", "so", "us", "mat", "ya", "ha"}
+    assert not HINDI_MARKERS & ENGLISH_MARKERS
+
+
+def test_a_little_non_latin_text_does_not_disqualify_a_review() -> None:
+    kept, _ = substantive(["Withdrawal pending for four days now, paisa नहीं aaya at all yet"])
+    assert len(kept) == 1
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("hello", 0.0), ("नमस्ते", 1.0), ("", 0.0), ("123 !!!", 0.0)],
+)
+def test_non_latin_ratio(text: str, expected: float) -> None:
+    assert non_latin_ratio(text) == pytest.approx(expected)
+
+
+# -- the report ------------------------------------------------------------------------
+
+
+def test_the_report_keeps_both_counts() -> None:
+    """The denominator the note must disclose, so a theme share is not read as a
+    population share."""
+    _, report = substantive(
+        ["good", "ok", "withdrawal has been pending for four days with no update"]
+    )
+
+    assert report.in_window == 3
+    assert report.kept == 1
+    assert report.summary()["kept_share"] == pytest.approx(1 / 3, abs=0.01)
+
+
+def test_each_drop_reason_is_counted_separately() -> None:
+    """So the cost of each filter is visible rather than lumped together."""
+    _, report = substantive(
+        [
+            "good",
+            "👍",
+            "नमस्ते जी कैसे हैं आप",
+            "ye app bahut acha hai mujhe koi problem nahi hui abhi tak",
+            "a real review with quite enough words in it to pass",
+        ]
+    )
+
+    assert set(report.dropped) == {
+        "fewer than 9 words",
+        "emoji or punctuation only",
+        "non-Latin script",
+        "non-English (romanized)",
+    }
+    assert report.total_dropped == 4
+
+
+def test_the_report_contains_no_review_text() -> None:
+    _, report = substantive(
+        ["please mail me at notareal@example.com about my stuck withdrawal right now"]
+    )
+    assert "notareal" not in str(report.summary())
+
+
+def test_an_empty_corpus_filters_to_empty() -> None:
+    kept, report = filter_substantive([])
+    assert kept == []
+    assert report.in_window == 0
+    assert report.summary()["kept_share"] == 0.0

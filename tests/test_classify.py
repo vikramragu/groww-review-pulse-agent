@@ -440,6 +440,37 @@ def test_a_second_run_makes_no_api_call(settings: Settings, tmp_path: Path) -> N
     assert all(c.theme is Theme.PAYMENTS_WITHDRAWALS for c in classified)
 
 
+def test_batches_finished_before_a_transport_failure_are_kept(
+    settings: Settings, tmp_path: Path
+) -> None:
+    """A dropped connection late in a long run must not throw away the batches already
+    paid for. Found on the real corpus: 43 batches, connection lost mid-run, cache empty."""
+    tuned = settings.model_copy(
+        update={
+            "pulse": settings.pulse.model_copy(
+                update={"llm": settings.pulse.llm.model_copy(update={"batch_size": 2})}
+            )
+        }
+    )
+    cache_path = tmp_path / "classify.json"
+    reviews = corpus(4)
+
+    def a_cache() -> ClassificationCache:
+        return ClassificationCache(
+            cache_path, taxonomy_version=tuned.taxonomy_version, model="fake-model"
+        )
+
+    failing = FakeLlm(responses=[full_reply(2), LlmError("Connection error.")])
+    with pytest.raises(LlmError):
+        classify_reviews(reviews, llm=failing, settings=tuned, cache=a_cache())
+
+    resumed = FakeLlm(responses=[full_reply(2)])
+    _, report = classify_reviews(reviews, llm=resumed, settings=tuned, cache=a_cache())
+
+    assert report.from_cache == 2
+    assert report.api_calls == 1
+
+
 def test_only_uncached_reviews_are_sent(settings: Settings, tmp_path: Path) -> None:
     cache_path = tmp_path / "classify.json"
     cache = ClassificationCache(

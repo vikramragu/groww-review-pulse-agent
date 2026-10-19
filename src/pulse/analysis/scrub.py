@@ -203,11 +203,12 @@ RULES: tuple[Rule, ...] = (
         re.compile(r"(?<![\w.@])@[A-Za-z0-9_]{2,}\b"),
         "[handle]",
     ),
-    # Backstop: any remaining long digit run, including ones broken up by separators that
-    # the specific rules above did not match.
+    # Backstop: any remaining run of 9+ digits, including ones broken up by single spaces or
+    # hyphens that the specific rules above did not match. Counting digits rather than
+    # characters keeps an ISO date ("2026-10-01", 8 digits) from being redacted as a number.
     Rule(
         "digits",
-        re.compile(r"\b\d[\d\s\-]{7,}\d\b"),
+        re.compile(r"\b\d(?:[\s\-]?\d){8,}\b"),
         "[number]",
     ),
     # ---- Layer 3: self-identification -------------------------------------------------

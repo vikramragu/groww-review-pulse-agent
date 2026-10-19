@@ -189,7 +189,12 @@ class RunLedger(BaseModel):
     status: Literal["running", "ok", "aborted", "partial"] = "running"
     mcp_mode: Literal["none", "stub", "live"] = "none"
 
+    #: Reviews that survived substance filtering -- the analysable corpus.
     corpus_size: int | None = None
+    #: Reviews the window actually received, before substance filtering. Kept because the
+    #: filters are sample selection: the note must disclose both, or a theme share gets
+    #: read as a population share.
+    corpus_total: int | None = None
     window_weeks: int | None = None
     theme_counts: dict[str, int] = Field(default_factory=dict)
 

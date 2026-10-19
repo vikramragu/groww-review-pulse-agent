@@ -9,6 +9,21 @@ new adapter registered beside `file_drop` — not a change to anything downstrea
 
 ---
 
+## Getting an export
+
+```bash
+pulse fetch                    # last complete week's window, into data/raw/
+pulse fetch --week 2026-W41    # a specific target week
+pulse fetch --dry-run          # one page, report only, writes nothing
+```
+
+`pulse fetch` downloads public Play Store reviews and writes them here in the format below.
+It is **not** a pipeline stage — the pipeline only ever reads files (architecture.md O1
+explains why, including the terms-of-service trade-off involved). It needs the optional
+scraper extra: `pip install -e '.[scraper]'`.
+
+You can also drop in an export from anywhere else, as long as it matches the shape below.
+
 ## Where files go
 
 ```
@@ -119,6 +134,7 @@ Rows are dropped for exactly these reasons, each counted in the run ledger:
 | 1 | no text or title; no date; out-of-scope `source` |
 | 2 | empty text; missing date; unparseable date; missing rating; duplicate |
 | 2 | outside the configured window |
+| 2 | substance filter: emoji or punctuation only; non-Latin script; romanized Hindi; 8 words or fewer (architecture.md §10) |
 | 3 | text was entirely PII, leaving nothing quotable |
 
 ### Deduplication
@@ -141,7 +157,7 @@ prose is what makes the verbatim guarantee mean anything.
 
 ## Fixture
 
-`tests/fixtures/reviews_sample.json` is a 263-row synthetic corpus spanning 12 ISO weeks,
+`tests/fixtures/reviews_sample.json` is a 270-row synthetic corpus spanning 12 ISO weeks,
 regenerated deterministically by:
 
 ```bash

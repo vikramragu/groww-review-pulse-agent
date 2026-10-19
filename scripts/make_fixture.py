@@ -212,6 +212,31 @@ def _add_edge_cases(rows: list[dict[str, object]], rng: random.Random, last_mond
         }
     )
 
+    # Substance filter (stage 2): one row per drop reason, and two that must survive.
+    rows.extend(
+        [
+            {"rating": 2, "text": "Chart screen takes far too long to load.", "date": day},
+            {
+                "rating": 2,
+                "text": "Chart screen takes far too long to load every morning.",
+                "date": day,
+            },
+            {"rating": 1, "text": "Chart screen takes far too long to load 😡😡", "date": day},
+            {"rating": 5, "text": "👍👍👍", "date": day},
+            {"rating": 1, "text": "पैसा अभी तक खाते में नहीं आया है", "date": day},
+            {
+                "rating": 1,
+                "text": "Withdrawal ka paisa abhi tak nahi aaya, bahut din ho gaye hai",
+                "date": day,
+            },
+            {
+                "rating": 1,
+                "text": "Withdrawal pending for a week and the paisa is still not in my bank",
+                "date": day,
+            },
+        ]
+    )
+
     # A row outside the window: filtered out by stage 2.
     rows.append(
         {
