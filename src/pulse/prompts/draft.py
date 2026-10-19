@@ -14,9 +14,11 @@ validator checks it mechanically; the prompt alone was never going to be enough.
 
 from __future__ import annotations
 
-from pulse.models import ThemeStats
+from pulse.models import ThemeStats, direction_of
 
 WORD_BUDGET = 250
+#: Roughly what `render.figures_text` adds across three themes (~12 tokens each).
+FIGURES_WORDS = 36
 
 DRAFT_SYSTEM_PROMPT = f"""\
 You write a weekly one-page pulse from Groww app review data, for a product team to scan \
@@ -35,19 +37,34 @@ reads slightly better but differs by one character is rejected. Copy and paste.
    `review_id` and `rating` on each quote are overwritten by the pipeline from the review \
 the quote actually came from -- put anything there, it is ignored. Do not try to guess them.
 4. The note body must be at most {WORD_BUDGET} words. Words are whitespace-separated \
-tokens in the headline, theme summaries, quotes, and action text. Aim for about \
-{WORD_BUDGET - 40} so there is headroom.
+tokens in the headline, theme summaries, quotes, and action text, **plus** a line of \
+figures the pipeline prints beside each theme (about {FIGURES_WORDS} words in all). \
+You are bad at counting a whole note, so keep to these per-field limits instead, which \
+leave room for the quotes and figures:
+   - headline: at most 10 words
+   - each theme summary: at most 12 words
+   - each action: at most 12 words
+   - each rationale: at most 12 words
+   - quotes: prefer one under 30 words from each pool; quotes count too.
 5. Each action idea must name one of the three themes on the page, and must be something \
 a team could actually start on Monday -- not "improve reliability".
+6. **No numbers in the headline or the theme summaries.** The pipeline prints each \
+theme's review count, share, change and rating beside it, from the data. A summary says \
+*what* users report ("stop-loss orders not placed", "login fails after the update"), not \
+how many. Any digit there is rejected.
+   `review_count` and `direction` on each theme are likewise overwritten by the pipeline.
 
 STYLE
 
 Write for a product lead who has thirty seconds. Lead with what changed, not with \
-pleasantries. Use the numbers you are given; do not invent any. Where a theme is \
-improving, say so -- a pulse that only ever reports problems stops being read.
+pleasantries. Where a theme is improving, say so -- a pulse that only ever reports \
+problems stops being read.
 
-`direction` is "up" if the theme grew as a share of the week, "down" if it shrank, "flat" \
-if it barely moved. Use the delta figures supplied; do not guess.
+A theme's direction is given in the input: "up" means it took a larger share of this \
+week's reviews than in the prior weeks, "down" a smaller share, "flat" barely moved. For \
+a complaint theme, "down" is the improvement. Call a theme improving only when its \
+direction is "down". Mean rating is not a trend -- you have no earlier rating to compare \
+with -- so a theme with a higher rating than the others is not "improving".
 
 Redacted spans appear as bracketed placeholders such as [email]. No supplied quote should \
 contain one -- if one does, choose a different quote from the pool.
@@ -71,20 +88,15 @@ def render_draft_input(stats: list[ThemeStats], *, iso_week: str, corpus_size: i
     ]
 
     for position, theme in enumerate(stats, start=1):
-        direction = (
-            "up"
-            if theme.delta_vs_baseline > 0.01
-            else "down"
-            if theme.delta_vs_baseline < -0.01
-            else "flat"
-        )
         lines.extend(
             [
                 f"THEME {position}: {theme.theme.value}",
                 f"  reviews this week: {theme.review_count}",
                 f"  share of week: {theme.share_of_week:.1%}",
                 f"  mean rating: {theme.mean_rating:.1f} / 5",
-                f"  change vs trailing weeks: {theme.delta_vs_baseline:+.1%} ({direction})",
+                f"  change in share vs the prior {theme.baseline_weeks} weeks: "
+                f"{theme.delta_vs_baseline * 100:+.1f} percentage points "
+                f"({direction_of(theme.delta_vs_baseline)})",
                 "  quotes you may use, copy one exactly:",
             ]
         )

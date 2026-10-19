@@ -247,6 +247,7 @@ def aggregate(
             mean_rating=mean_rating,
             delta_vs_baseline=share - baseline_share,
             quote_candidates=candidates,
+            baseline_weeks=len(baseline_weeks),
         )
 
     max_negative = max(negatives.values(), default=0)

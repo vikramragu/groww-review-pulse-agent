@@ -15,9 +15,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from pulse.models import PulseNote, Theme
+from pulse.models import PulseNote, Theme, ThemeFigures
 from pulse.rendering.render import (
     email_subject,
+    figures_text,
     render_blocks,
     render_email_body,
     render_note,
@@ -250,3 +251,48 @@ def test_blocks_disclose_the_substantive_subset() -> None:
 
 def test_block_rendering_is_deterministic() -> None:
     assert render_blocks(a_note(), corpus_size=241) == render_blocks(a_note(), corpus_size=241)
+
+
+# --------------------------------------------------------------------------------------
+# Figures are printed by code
+# --------------------------------------------------------------------------------------
+
+
+def with_figures(note: PulseNote, *, baseline_weeks: int = 11) -> PulseNote:
+    figures = ThemeFigures(
+        review_count=37,
+        share_of_week=0.25694,
+        delta_vs_baseline=0.05554,
+        baseline_weeks=baseline_weeks,
+        mean_rating=2.6216,
+    )
+    themes = [s.model_copy(update={"figures": figures}) for s in note.top_themes]
+    return note.model_copy(update={"top_themes": themes})
+
+
+def test_theme_lines_carry_the_pipelines_figures() -> None:
+    markdown = render_note(with_figures(a_note()), corpus_size=241)
+    assert "(37 reviews, 25.7% of week, +5.6 pts vs prior 11 wks, 2.6★)" in markdown
+
+
+def test_the_change_is_labelled_in_points_against_the_baseline_not_week_over_week() -> None:
+    markdown = render_note(with_figures(a_note()), corpus_size=241)
+    assert "week-over-week" not in markdown
+    assert "+5.6%" not in markdown
+
+
+def test_no_baseline_means_no_change_figure() -> None:
+    markdown = render_note(with_figures(a_note(), baseline_weeks=0), corpus_size=241)
+    assert "(37 reviews, 25.7% of week, 2.6★)" in markdown
+    assert "pts" not in markdown
+
+
+def test_a_note_without_figures_falls_back_to_the_count() -> None:
+    assert "(10 reviews)" in render_note(a_note(), corpus_size=241)
+
+
+def test_blocks_carry_the_same_figures_as_the_markdown() -> None:
+    note = with_figures(a_note())
+    blocks = render_blocks(note, corpus_size=241)
+    expected = figures_text(note.top_themes[0])
+    assert any(expected in block.text for block in blocks if block.type == "bullet")

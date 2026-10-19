@@ -285,3 +285,39 @@ def test_the_history_records_every_attempt(settings: Settings) -> None:
     assert [r.attempt for r in outcome.history] == [1, 2]
     assert not outcome.history[0].ok
     assert outcome.history[1].ok
+
+
+# --------------------------------------------------------------------------------------
+# Figures
+# --------------------------------------------------------------------------------------
+
+
+def test_the_published_figures_are_the_pipelines_not_the_models(settings: Settings) -> None:
+    """The model sent review_count 10 and "flat"; stats say 10 reviews at +1.0 point.
+    The note on disk and the markdown both carry stage 5's figures."""
+    outcome = run(settings, FakeLlm(responses=[reply()]))
+
+    for summary in outcome.note.top_themes:
+        assert summary.figures is not None
+        assert summary.figures.share_of_week == 0.2
+    assert "(10 reviews, 20.0% of week, 2.0★)" in outcome.markdown
+
+
+def test_a_number_in_the_headline_is_sent_back_to_the_model(settings: Settings) -> None:
+    llm = FakeLlm(responses=[reply(headline="Reliability up 5.6% this week"), reply()])
+    outcome = run(settings, llm)
+
+    assert outcome.report.accepted_on_attempt == 2
+    assert outcome.report.failures_by_check == {"figures": 1}
+
+
+def test_the_accepted_markdown_keeps_the_substantive_disclosure(settings: Settings) -> None:
+    outcome = draft_note(
+        stats(),
+        llm=FakeLlm(responses=[reply()]),
+        settings=settings,
+        iso_week="2026-W41",
+        corpus_size=241,
+        corpus_total=900,
+    )
+    assert "241 substantive reviews of 900 in window" in outcome.markdown

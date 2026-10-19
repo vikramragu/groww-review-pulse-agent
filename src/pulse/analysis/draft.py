@@ -31,7 +31,7 @@ from pulse.prompts.draft import (
     render_retry_feedback,
 )
 from pulse.rendering.render import render_note
-from pulse.rendering.validate import ValidationResult, validate_note
+from pulse.rendering.validate import ValidationResult, ground_theme_summaries, validate_note
 
 log = pulse_logging.get_logger("analysis.draft")
 
@@ -130,6 +130,9 @@ def draft_note(
             feedback = render_retry_feedback([f"the reply was rejected: {exc}"], attempt)
             continue
 
+        # Figures are the pipeline's, attached before rendering so the word count covers
+        # what the reader will actually see.
+        note = ground_theme_summaries(note, stats)
         markdown = render_note(
             note,
             corpus_size=corpus_size,
@@ -157,7 +160,12 @@ def draft_note(
             # The grounded note, not the model's: its quotes carry the real review_id and
             # rating from the source review rather than whatever the model wrote there.
             note = result.grounded_note or note
-            markdown = render_note(note, corpus_size=corpus_size, generated_on=generated_on)
+            markdown = render_note(
+                note,
+                corpus_size=corpus_size,
+                corpus_total=corpus_total,
+                generated_on=generated_on,
+            )
             report.provenance_corrections = result.provenance_corrections
             report.accepted_on_attempt = attempt
             log.info(

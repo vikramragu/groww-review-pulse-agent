@@ -14,6 +14,7 @@ from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic.json_schema import SkipJsonSchema
 
 # Addition (not in §7): ISO week strings are compared and sorted all over the pipeline, and
 # architecture.md §10 / plan P1 both flag the ISO-year boundary as a silent-corruption trap
@@ -108,6 +109,21 @@ class ThemeStats(BaseModel):
     mean_rating: float
     delta_vs_baseline: float  # share change vs trailing weeks
     quote_candidates: list[QuoteCandidate]  # verbatim, scrubbed, ranked, with provenance
+    #: How many trailing weeks `delta_vs_baseline` is measured against; 0 = no baseline.
+    baseline_weeks: int = 0
+
+
+#: A delta inside this band (as a fraction of the week, so 1 percentage point) is "flat".
+FLAT_BAND = 0.01
+
+
+def direction_of(delta_vs_baseline: float) -> Literal["up", "down", "flat"]:
+    """The one definition of a theme's direction, shared by the prompt and the gate."""
+    if delta_vs_baseline > FLAT_BAND:
+        return "up"
+    if delta_vs_baseline < -FLAT_BAND:
+        return "down"
+    return "flat"
 
 
 class Quote(BaseModel):
@@ -123,11 +139,26 @@ class ActionIdea(BaseModel):
     rationale: Annotated[str, StringConstraints(max_length=200)]
 
 
+class ThemeFigures(BaseModel):
+    """A theme's numbers exactly as stage 5 computed them. Never written by the model."""
+
+    review_count: int
+    share_of_week: float
+    delta_vs_baseline: float
+    baseline_weeks: int
+    mean_rating: float
+
+
 class ThemeSummary(BaseModel):
     theme: Theme
     summary: Annotated[str, StringConstraints(max_length=220)]
     review_count: int
     direction: Literal["up", "down", "flat"]
+    #: Filled from `ThemeStats` before rendering (`ground_theme_summaries`), the same way
+    #: quote provenance is. Hidden from the model's schema: a model asked to restate
+    #: figures it was given mislabels them, and the first real note did ("+5.6% week-over-
+    #: week" for a 5.6-point change against an 11-week baseline).
+    figures: SkipJsonSchema[ThemeFigures | None] = None
 
 
 class PulseNote(BaseModel):

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pulse.models import PulseNote, Theme
+from pulse.models import PulseNote, Theme, ThemeSummary
 from pulse.publish.ports import Block
 
 #: Human labels for the enum. Kept here rather than read from config so rendering stays a
@@ -33,6 +33,25 @@ DIRECTION_MARKS = {"up": "\u25b2", "down": "\u25bc", "flat": "-"}
 
 def theme_label(theme: Theme) -> str:
     return THEME_LABELS.get(theme, theme.value)
+
+
+def figures_text(summary: ThemeSummary) -> str:
+    """A theme's numbers, printed by code from stage 5's values -- never by the model.
+
+    The change is in percentage points of the week's share, against the pooled prior
+    weeks: "+5.6 pts vs prior 11 wks", which is what `delta_vs_baseline` actually measures.
+    Falls back to the bare count for a note drafted before figures were attached.
+    """
+    figures = summary.figures
+    if figures is None:
+        return f"{summary.review_count} reviews"
+    parts = [f"{figures.review_count} reviews", f"{figures.share_of_week:.1%} of week"]
+    if figures.baseline_weeks:
+        parts.append(
+            f"{figures.delta_vs_baseline * 100:+.1f} pts vs prior {figures.baseline_weeks} wks"
+        )
+    parts.append(f"{figures.mean_rating:.1f}★")
+    return ", ".join(parts)
 
 
 def render_note(
@@ -63,8 +82,7 @@ def render_note(
     for stats in note.top_themes:
         mark = DIRECTION_MARKS.get(stats.direction, "")
         lines.append(
-            f"- **{theme_label(stats.theme)}** {mark} "
-            f"({stats.review_count} reviews) — {stats.summary}"
+            f"- **{theme_label(stats.theme)}** {mark} ({figures_text(stats)}) — {stats.summary}"
         )
 
     lines.extend(["", "## What users said", ""])
@@ -113,8 +131,7 @@ def render_blocks(
         blocks.append(
             Block(
                 "bullet",
-                f"{theme_label(stats.theme)} {mark} ({stats.review_count} reviews) — "
-                f"{stats.summary}",
+                f"{theme_label(stats.theme)} {mark} ({figures_text(stats)}) — {stats.summary}",
             )
         )
 

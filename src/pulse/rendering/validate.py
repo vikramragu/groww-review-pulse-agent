@@ -24,13 +24,22 @@ from typing import Any
 
 from pulse import logging as pulse_logging
 from pulse.analysis.scrub import PiiLeakError, scan_for_pii
-from pulse.models import PulseNote, Quote, QuoteCandidate, Theme
+from pulse.models import (
+    PulseNote,
+    Quote,
+    QuoteCandidate,
+    Theme,
+    ThemeFigures,
+    ThemeStats,
+    direction_of,
+)
 
 log = pulse_logging.get_logger("rendering.validate")
 
 WORD_LIMIT = 250
 
 _WHITESPACE = re.compile(r"\s+")
+_DIGIT = re.compile(r"\d")
 
 #: Markdown syntax stripped before counting words. The count must measure the prose a
 #: reader sees, not the punctuation that formats it.
@@ -172,6 +181,40 @@ def ground_quote(quote: Quote, source: QuoteCandidate) -> tuple[Quote, bool]:
     return corrected, changed
 
 
+def ground_theme_summaries(note: PulseNote, stats: list[ThemeStats]) -> PulseNote:
+    """Replace each theme's count, direction and figures with stage 5's values.
+
+    The same reasoning as `ground_quote`: these are facts the pipeline holds, so the model
+    only gets to write the words around them. Runs before rendering, so the word count the
+    gate measures includes the figures a reader will see. A theme not in `stats` is left
+    as it is; the theme-validity check rejects it.
+    """
+    by_theme = {s.theme: s for s in stats}
+    grounded = []
+    for summary in note.top_themes:
+        source = by_theme.get(summary.theme)
+        if source is None:
+            grounded.append(summary)
+            continue
+        figures = ThemeFigures(
+            review_count=source.review_count,
+            share_of_week=source.share_of_week,
+            delta_vs_baseline=source.delta_vs_baseline,
+            baseline_weeks=source.baseline_weeks,
+            mean_rating=source.mean_rating,
+        )
+        grounded.append(
+            summary.model_copy(
+                update={
+                    "review_count": source.review_count,
+                    "direction": direction_of(source.delta_vs_baseline),
+                    "figures": figures,
+                }
+            )
+        )
+    return note.model_copy(update={"top_themes": grounded})
+
+
 # --------------------------------------------------------------------------------------
 # The gate
 # --------------------------------------------------------------------------------------
@@ -226,6 +269,23 @@ def validate_note(
                 "The three themes must be three different themes.",
             )
         )
+
+    # --- figures come from the pipeline, not the prose ---
+    # The model's words sit beside the real figures; a number in them is either a
+    # restatement (redundant, and how "+5.6% week-over-week" got published) or invented.
+    prose = [("The headline", note.headline)] + [
+        (f"The {s.theme.value} summary", s.summary) for s in note.top_themes
+    ]
+    for where, text in prose:
+        if _DIGIT.search(text):
+            result.failures.append(
+                ValidationFailure(
+                    "figures",
+                    f"{where} contains a number ({text!r}). The pipeline prints each "
+                    f"theme's figures next to it; write words only -- say what users "
+                    f"report, not how many.",
+                )
+            )
 
     # --- quotes: verbatim, provenance, distinctness (P3-T13, P3-T14) ---
     source_ids: list[str] = []

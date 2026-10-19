@@ -868,6 +868,23 @@ records only what the agent relies on:
 | **Stage 8 rendered `pulse.md` without `corpus_total`** | The "N substantive reviews of M in window" disclosure required by §5.1 never reached the published note. Fixed in both renderers. |
 | **The Phase 4 stub's state file crashed the Phase 5 stub** | A stale `.cache/stub-mcp-state.json` made `--mcp stub` fail as "exited during startup". The state file is versioned; an old one is ignored. |
 
+#### First real-data note (2026-10-19) — figures moved from the model to the code
+
+The live server now passes `pulse doctor` and `pulse contract check` (token, doc access,
+three tools, and no send tool advertised: D-1 applied). Stages 5–8 then ran on the real
+corpus for the first time. The note passed every gate, but a read against `05_stats.json`
+found three faults the gate could not see:
+
+| Fault | Cause | Fix |
+| --- | --- | --- |
+| "up 5.6% week-over-week" | The model restated `delta_vs_baseline`, a 5.6-*point* change against the pooled prior 11 weeks | Figures are printed by `render.figures_text` from `ThemeFigures`, attached by `ground_theme_summaries` (like quote provenance) and hidden from the model's schema. New `figures` check rejects any digit in the headline or theme summaries |
+| "execution improves" | The model read a higher mean rating as a trend; the theme actually rose 3.3 points | Prompt: "improving" only when direction is down; rating is not a trend. `direction` and `review_count` are now overwritten from stats (`direction_of`, shared by prompt and gate) |
+| A failed re-draft left the previous `06_note.json` and `pulse.md` on disk | `--from 9` would have published a note the run had just rejected | Stage 6 deletes both on abort; pinned by `test_a_failed_redraft_removes_the_previous_note` |
+
+The figures cost ~36 words. With only a total budget the model overshot three times
+(288 → 286 → 272) and the run aborted; per-field word limits in the prompt fixed it (223
+words, first attempt). Also fixed: the draft loop's final re-render dropped `corpus_total`.
+
 **Waiting on the owner before P5-T8:**
 
 - `PULSE_MCP_TOKEN` in `.env`;

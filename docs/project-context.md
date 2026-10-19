@@ -184,6 +184,8 @@ and Google authorization (one OAuth token serves both APIs) before any LLM spend
 | P5 | Replaying into the run that published overwrote its `appended` record with `skipped`, so the next run appended the week again. |
 | P5 | The SDK reports HTTP 401 as a generic error; the session now records 401/403 itself, so a wrong token says so. |
 | P5 | Stage 8 rendered `pulse.md` without `corpus_total`, dropping the substantive-subset disclosure. |
+| P5 | On real data the model mislabelled figures ("+5.6% week-over-week" for +5.6 pts vs an 11-week baseline). Figures are now printed by code; digits in the model's headline or summaries are rejected. |
+| P5 | A failed re-draft left the old note on disk for `--from 9` to publish. Stage 6 now deletes it on abort. |
 
 ## Configuration and secrets
 

@@ -13,10 +13,21 @@ text no reviewer wrote, which is the same as not having the check at all.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from pulse.analysis.scrub import PiiLeakError
-from pulse.models import ActionIdea, PulseNote, Quote, QuoteCandidate, Theme
+from pulse.llm import json_schema_for
+from pulse.models import (
+    ActionIdea,
+    PulseNote,
+    Quote,
+    QuoteCandidate,
+    Theme,
+    ThemeStats,
+    direction_of,
+)
 from pulse.rendering.render import render_note
 from pulse.rendering.validate import (
     WORD_LIMIT,
@@ -24,6 +35,7 @@ from pulse.rendering.validate import (
     count_note_words,
     find_verbatim_source,
     ground_quote,
+    ground_theme_summaries,
     normalize_for_comparison,
     validate_note,
 )
@@ -610,3 +622,82 @@ def test_assert_publishable_raises_pii_leak_for_a_fatal_result() -> None:
     result = validate_note(note, markdown, allowed_themes=THEMES, candidates_by_theme=pools())
     with pytest.raises(PiiLeakError):
         assert_publishable(result, markdown)
+
+
+# --------------------------------------------------------------------------------------
+# Figures belong to the pipeline, not the prose
+# --------------------------------------------------------------------------------------
+
+
+def theme_stats(theme: Theme, delta: float) -> ThemeStats:
+    return ThemeStats(
+        theme=theme,
+        review_count=37,
+        share_of_week=0.257,
+        mean_rating=2.62,
+        delta_vs_baseline=delta,
+        quote_candidates=[],
+        baseline_weeks=11,
+    )
+
+
+def test_the_model_never_sees_a_figures_field() -> None:
+    assert "figures" not in json.dumps(json_schema_for(PulseNote))
+
+
+def test_grounding_replaces_the_models_count_and_direction() -> None:
+    """The model said 10 reviews, flat; stage 5 says 37, up 5.6 points."""
+    stats = [theme_stats(t, 0.056) for t in THEMES]
+    grounded = ground_theme_summaries(a_note(), stats)
+
+    for summary in grounded.top_themes:
+        assert summary.review_count == 37
+        assert summary.direction == "up"
+        assert summary.figures is not None
+        assert summary.figures.baseline_weeks == 11
+        assert summary.figures.delta_vs_baseline == 0.056
+
+
+def test_direction_follows_the_one_point_band() -> None:
+    assert direction_of(0.011) == "up"
+    assert direction_of(-0.011) == "down"
+    assert direction_of(0.01) == "flat"
+    assert direction_of(-0.004) == "flat"
+
+
+def test_grounding_leaves_an_off_page_theme_for_the_validity_check() -> None:
+    stats = [theme_stats(Theme.APP_RELIABILITY, 0.0)]
+    grounded = ground_theme_summaries(a_note(), stats)
+    untouched = [s for s in grounded.top_themes if s.theme is not Theme.APP_RELIABILITY]
+    assert all(s.figures is None for s in untouched)
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "Up 5.6% week-over-week as login failures spread.",
+        "Login failures in 37 reviews.",
+        "A quarter of reviews (25.7%) mention login.",
+    ],
+)
+def test_a_number_in_a_summary_is_rejected(summary: str) -> None:
+    themes = [
+        {"theme": t.value, "summary": summary, "review_count": 10, "direction": "flat"}
+        for t in THEMES
+    ]
+    result = check(a_note(top_themes=themes))
+    assert "figures" in failed_checks(result)
+    assert "write words only" in " ".join(result.messages())
+
+
+def test_a_number_in_the_headline_is_rejected() -> None:
+    result = check(a_note(headline="Reliability up 5.6 points this week"))
+    assert "figures" in failed_checks(result)
+
+
+def test_figures_printed_by_the_renderer_do_not_trip_the_check() -> None:
+    """The check reads the model's prose, not the rendered line that carries figures."""
+    note = ground_theme_summaries(a_note(), [theme_stats(t, 0.056) for t in THEMES])
+    result = check(note)
+    assert result.ok, result.messages()
+    assert all(s.figures is not None for s in result.grounded_note.top_themes)  # type: ignore[union-attr]
