@@ -417,6 +417,31 @@ def test_replaying_into_the_same_run_never_erases_the_record(
     assert context.read_artifact(10)["status"] == "created"
 
 
+def test_moving_to_another_doc_gets_a_draft_that_links_to_it(
+    settings: Settings, tmp_path: Path
+) -> None:
+    """Found on the first live run: after publishing to a scratch doc, publishing the same
+    week to the standing doc skipped the draft, leaving only one that linked to scratch."""
+    state = tmp_path / "stub.json"
+    context = publishable_run(tmp_path / "runs")
+    run_publish(context, stub_settings(settings, state))
+
+    stored = stub_state(state)
+    stored["documents"]["real-doc"] = {"title": "Groww Review Pulse", "sections": []}
+    state.write_text(json.dumps(stored), encoding="utf-8")
+    real = stub_settings(settings, state, document_id="real-doc")
+    run_publish(context, real)
+
+    drafts = stub_state(state)["drafts"]
+    assert len(drafts) == 2
+    assert "/d/real-doc/" in drafts[1]["body"]
+    assert context.read_artifact(10)["status"] == "created"
+
+    # And the standing doc's draft is then not repeated.
+    run_publish(context, real)
+    assert len(stub_state(state)["drafts"]) == 2
+
+
 def test_republish_appends_and_drafts_again(settings: Settings, tmp_path: Path) -> None:
     state = tmp_path / "stub.json"
     configured = stub_settings(settings, state)

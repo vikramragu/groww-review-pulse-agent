@@ -472,11 +472,13 @@ def stage_publish_doc(
     detail.update(published.summary())
 
 
-def _earlier_draft(context: RunContext) -> dict[str, str] | None:
+def _earlier_draft(context: RunContext, document_url: str) -> dict[str, str] | None:
     """The draft already made for this week's publication, if any.
 
     The publication is this run's own (stage 9 appended here) or an earlier run's (stage 9
-    skipped, pointing at it). Either way, a draft that run already made is not repeated.
+    skipped, pointing at it). Either way, a draft that run already made is not repeated --
+    but only if it links to the same doc. Found on the first live run: the scratch-doc
+    draft would otherwise have stopped the standing doc from ever getting one.
     """
     if not context.artifact_path(9).exists():
         return None
@@ -489,10 +491,13 @@ def _earlier_draft(context: RunContext) -> dict[str, str] | None:
         return None
     path = context.run_dir.parent / publisher / context.artifact_path(10).name
     try:
-        draft_id = json.loads(path.read_text(encoding="utf-8")).get("draft_id")
+        record = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    return {"draft_id": draft_id, "drafted_in": publisher} if draft_id else None
+    draft_id = record.get("draft_id")
+    if not draft_id or record.get("document_url") != document_url:
+        return None
+    return {"draft_id": draft_id, "drafted_in": publisher}
 
 
 def stage_draft_email(
@@ -516,7 +521,7 @@ def stage_draft_email(
     subject = email_subject(note)
 
     # A week already published was drafted then too; a second draft is just clutter.
-    if (earlier := _earlier_draft(context)) and not options.republish:
+    if (earlier := _earlier_draft(context, document_url)) and not options.republish:
         log.warning("week already drafted; not creating another", extra=earlier)
         record: dict[str, object] = {"status": "skipped", **earlier, "subject": subject}
         if earlier["drafted_in"] != context.run_dir.name:
