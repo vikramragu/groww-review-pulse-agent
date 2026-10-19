@@ -234,6 +234,9 @@ class RunLedger(BaseModel):
 
     document_url: str | None = None
     draft_id: str | None = None
+    #: `01_raw.json` was deleted after the run succeeded (O6), so `--from 1` or `--from 2`
+    #: into this run means re-ingesting from the export.
+    raw_artifact_deleted: bool = False
 
     stages: list[StageRecord] = Field(default_factory=list)
     abort_reason: str | None = None

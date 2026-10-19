@@ -168,6 +168,16 @@ class DocsConfig(BaseModel):
         return self.title_template.format(week=iso_week)
 
 
+class RetentionConfig(BaseModel):
+    """O6: how long the artifacts that may hold PII as exported are kept."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: Keep `01_raw.json` after a successful run. Off by default: from stage 3 on every
+    #: artifact is scrubbed, and the export in `data/raw/` can always rebuild it.
+    keep_raw_artifact: bool = False
+
+
 class PulseConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -178,6 +188,7 @@ class PulseConfig(BaseModel):
     llm: LlmConfig = Field(default_factory=LlmConfig)
     thresholds: ThresholdConfig = Field(default_factory=ThresholdConfig)
     docs: DocsConfig = Field(default_factory=DocsConfig)
+    retention: RetentionConfig = Field(default_factory=RetentionConfig)
 
 
 class ThemeDefinition(BaseModel):

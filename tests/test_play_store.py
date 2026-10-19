@@ -28,6 +28,7 @@ from pulse.ingest.play_store import (
     FetchError,
     default_export_path,
     fetch_window,
+    prune_old_exports,
     write_export,
 )
 
@@ -337,3 +338,40 @@ def test_the_report_contains_no_review_text() -> None:
         sleep=no_sleep,
     )
     assert "notareal" not in str(report.summary())
+
+
+# --------------------------------------------------------------------------------------
+# Retention (O6, P6-T7) -- exports fetched before the window are pruned
+# --------------------------------------------------------------------------------------
+
+
+def test_exports_fetched_before_the_window_are_deleted(tmp_path: Path) -> None:
+    old = default_export_path(tmp_path, date(2026, 7, 1))
+    edge = default_export_path(tmp_path, WINDOW_START)
+    new = default_export_path(tmp_path, date(2026, 10, 11))
+    for path in (old, edge, new):
+        path.write_text("[]", encoding="utf-8")
+
+    removed = prune_old_exports(tmp_path, WINDOW_START)
+
+    assert removed == [old]
+    assert not old.exists()
+    assert edge.exists() and new.exists()
+
+
+def test_files_not_named_by_fetch_are_never_deleted(tmp_path: Path) -> None:
+    """A hand-dropped export, another app's export, or a CSV is the owner's, not ours."""
+    keep = [
+        tmp_path / "my-export-2020-01-01.json",
+        tmp_path / "com-other-app-2020-01-01.json",
+        tmp_path / "com-nextbillion-groww-2020-01-01.csv",
+    ]
+    for path in keep:
+        path.write_text("[]", encoding="utf-8")
+
+    assert prune_old_exports(tmp_path, WINDOW_START, GROWW_APP_ID) == []
+    assert all(path.exists() for path in keep)
+
+
+def test_pruning_a_missing_directory_is_a_no_op(tmp_path: Path) -> None:
+    assert prune_old_exports(tmp_path / "absent", WINDOW_START) == []

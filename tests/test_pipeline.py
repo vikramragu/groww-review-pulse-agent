@@ -29,7 +29,15 @@ FIXTURE_WEEK = "2026-W41"
 
 @pytest.fixture
 def settings() -> Settings:
-    return load_settings(Path("config"))
+    """Keeps `01_raw.json`: most tests here inspect ingestion's output after the run.
+    Retention itself is tested below with the configured default (`pruning_settings`)."""
+    return keep_raw(load_settings(Path("config")), keep=True)
+
+
+def keep_raw(settings: Settings, *, keep: bool) -> Settings:
+    pulse = settings.pulse
+    retention = pulse.retention.model_copy(update={"keep_raw_artifact": keep})
+    return settings.model_copy(update={"pulse": pulse.model_copy(update={"retention": retention})})
 
 
 def options(settings: Settings, tmp_path: Path, **overrides: object) -> PipelineOptions:
@@ -503,3 +511,66 @@ def test_a_failed_redraft_removes_the_previous_note(settings: Settings, tmp_path
     assert not context.artifact_path(6).exists()
     assert not context.note_path.exists()
     assert context.read_artifact(7)["status"] == "aborted"
+
+
+# --------------------------------------------------------------------------------------
+# Retention (O6, P6-T7) -- the raw artifact does not outlive a successful run
+# --------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def pruning_settings() -> Settings:
+    settings = load_settings(Path("config"))
+    assert settings.pulse.retention.keep_raw_artifact is False, "the default must prune"
+    return settings
+
+
+def test_a_successful_run_deletes_the_raw_artifact(
+    pruning_settings: Settings, tmp_path: Path
+) -> None:
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    run_stages(context, options(pruning_settings, tmp_path))
+
+    assert not context.artifact_path(1).exists()
+    assert context.artifact_path(3).exists()
+    assert context.ledger.raw_artifact_deleted
+    stored = json.loads((context.run_dir / "run.json").read_text(encoding="utf-8"))
+    assert stored["raw_artifact_deleted"] is True
+
+
+def test_a_run_that_stops_before_the_scrubber_keeps_it(
+    pruning_settings: Settings, tmp_path: Path
+) -> None:
+    """Nothing scrubbed exists yet, and ingestion may be what is being debugged."""
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    run_stages(context, options(pruning_settings, tmp_path, to_stage=2))
+
+    assert context.artifact_path(1).exists()
+    assert not context.ledger.raw_artifact_deleted
+
+
+def test_a_failed_run_keeps_it(pruning_settings: Settings, tmp_path: Path) -> None:
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    with pytest.raises(LlmNotConfigured):
+        run_stages(
+            context,
+            options(pruning_settings, tmp_path, to_stage=4, llm_override="none"),
+        )
+
+    assert context.artifact_path(1).exists()
+
+
+def test_keep_raw_artifact_keeps_it(settings: Settings, tmp_path: Path) -> None:
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    run_stages(context, options(settings, tmp_path))
+    assert context.artifact_path(1).exists()
+
+
+def test_replaying_normalize_after_deletion_says_why(
+    pruning_settings: Settings, tmp_path: Path
+) -> None:
+    context = start_run(FIXTURE_WEEK, tmp_path)
+    run_stages(context, options(pruning_settings, tmp_path))
+
+    with pytest.raises(PipelineError, match="--from 1"):
+        run_stages(context, options(pruning_settings, tmp_path, from_stage=2))

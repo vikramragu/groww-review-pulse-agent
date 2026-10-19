@@ -119,6 +119,11 @@ def stage_normalize(
     context: RunContext, options: PipelineOptions, detail: dict[str, object]
 ) -> None:
     """Type, deduplicate, and window-filter the corpus into `02_normalized.json`."""
+    if context.ledger.raw_artifact_deleted and not context.artifact_path(1).exists():
+        raise PipelineError(
+            "01_raw.json was deleted after this run succeeded (retention, O6). "
+            "Re-ingest with `--from 1`, or set retention.keep_raw_artifact = true."
+        )
     raw_reviews = context.read_models(1, RawReview)
 
     reviews, report = normalize(raw_reviews)
@@ -646,3 +651,23 @@ def run_stages(context: RunContext, options: PipelineOptions) -> None:
     for stage in range(options.from_stage, options.to_stage + 1):
         with context.stage(stage) as detail:
             _STAGES[stage](context, options, detail)
+
+    _prune_raw_artifact(context, options)
+
+
+def _prune_raw_artifact(context: RunContext, options: PipelineOptions) -> None:
+    """Delete `01_raw.json` once the run has succeeded past the scrubber (O6, P6-T7).
+
+    It is the only run artifact that may hold PII as exported. Kept when a run fails (this
+    is not reached) and when the run stopped before stage 3, so ingestion can still be
+    debugged; the export in `data/raw/` rebuilds it either way.
+    """
+    raw = context.artifact_path(1)
+    if options.settings.pulse.retention.keep_raw_artifact or not raw.exists():
+        return
+    if not context.artifact_path(3).exists():
+        return
+    raw.unlink()
+    context.ledger.raw_artifact_deleted = True
+    context.save_ledger()
+    log.info("raw artifact deleted after a successful run", extra={"path": str(raw)})

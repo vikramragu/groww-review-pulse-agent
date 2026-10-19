@@ -93,3 +93,11 @@ title_template = "Groww Review Pulse — {week}"
 # server cannot create or find documents, so create it once by hand in the account the
 # server is authorized as. Not a secret; PULSE_DOC_ID overrides it (e.g. for a scratch doc).
 document_id = "1z2tsdsQ0BkiDA3nPC4xN2AGaZLs80YdAxrK7Lfj9bJ0"
+
+[retention]
+# O6 (implementation-plan.md P6-T7). `01_raw.json` is the one run artifact that may hold
+# PII as exported; every artifact from stage 3 on is scrubbed. It is deleted once a run
+# has succeeded through stage 3, and kept when a run fails so the failure can be debugged.
+# Set true to keep it while debugging ingestion. Exports in data/raw/ dated before the
+# window are pruned by `pulse fetch`; newer ones stay, since they are the source data.
+keep_raw_artifact = false

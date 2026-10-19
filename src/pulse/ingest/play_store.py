@@ -37,6 +37,7 @@ everything". Paced between pages, with a hard page cap so a bug cannot turn into
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -269,3 +270,29 @@ def default_export_path(root: Path, fetched_on: date, app_id: str = GROWW_APP_ID
     """`data/raw/<app>-<date>.json` — dated, so fetches accumulate rather than overwrite."""
     slug = app_id.replace(".", "-")
     return root / f"{slug}-{fetched_on.isoformat()}.json"
+
+
+def prune_old_exports(root: Path, before: date, app_id: str = GROWW_APP_ID) -> list[Path]:
+    """Delete this app's dated exports fetched before `before` (O6, P6-T7).
+
+    An export fetched before the window starts holds no review the window can use, only
+    raw text that may contain PII. Only files named exactly as `default_export_path` names
+    them are touched, so an export dropped in by hand is never deleted.
+    """
+    slug = app_id.replace(".", "-")
+    pattern = re.compile(rf"^{re.escape(slug)}-(\d{{4}}-\d{{2}}-\d{{2}})\.json$")
+    removed: list[Path] = []
+    if not root.is_dir():
+        return removed
+    for path in sorted(root.iterdir()):
+        match = pattern.match(path.name)
+        if not match or not path.is_file():
+            continue
+        try:
+            fetched_on = date.fromisoformat(match.group(1))
+        except ValueError:
+            continue
+        if fetched_on < before:
+            path.unlink()
+            removed.append(path)
+    return removed

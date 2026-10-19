@@ -35,6 +35,7 @@ from pulse.ingest.play_store import (
     FetchError,
     default_export_path,
     fetch_window,
+    prune_old_exports,
     write_export,
 )
 from pulse.llm import LlmError, list_groq_models, probe_schema_support
@@ -260,6 +261,9 @@ def fetch(
     written = write_export(rows, target)
 
     typer.secho(f"\nWrote {len(rows)} reviews to {written}", fg=typer.colors.GREEN, bold=True)
+    # O6: exports fetched before the window can no longer feed a run, only hold raw text.
+    for pruned in prune_old_exports(written.parent, window_start, play.app_id):
+        typer.secho(f"Deleted {pruned} (fetched before the window)", fg=typer.colors.BRIGHT_BLACK)
     typer.echo("")
     typer.echo("Next:")
     typer.echo(f"  pulse run --dry-run --input {written} --week {target_week}")
