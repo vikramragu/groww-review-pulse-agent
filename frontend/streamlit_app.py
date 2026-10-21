@@ -2,9 +2,11 @@
 
     streamlit run frontend/streamlit_app.py
 
-**Local** (a `runs/` folder with finished runs): browse any run, check health, fetch
-reviews, run the analysis, and publish to the Doc and a Gmail draft -- each action calls
-the same `pulse` CLI, and publishing asks for confirmation first.
+**Local** (finished runs in `runs/`, or a `.env`): browse any run, check health, and run
+the week by hand -- *Fetch & analyse* (publishes nothing), read the note, then *Publish*
+behind a confirmation, which also writes the public snapshot. Each action calls the same
+`pulse` CLI, so the dashboard and the terminal can't disagree. There is no schedule: a
+week runs when someone presses the button or types the command.
 
 **Public** (Streamlit Community Cloud, no `runs/`): a read-only view of the latest
 `snapshots/<week>.json`, verified on load. No token, no publishing.
@@ -79,7 +81,8 @@ def choose_mode() -> str:
     forced = os.environ.get("PULSE_UI_MODE", "").strip().lower()
     if forced in {"local", "snapshot"}:
         return forced
-    return "local" if list_runs(RUNS) else "snapshot"
+    # A checkout with runs or a .env is someone's machine; Streamlit Cloud has neither.
+    return "local" if list_runs(RUNS) or (ROOT / ".env").is_file() else "snapshot"
 
 
 MODE = choose_mode()
@@ -148,7 +151,7 @@ if MODE == "snapshot" and view is not None:
     )
 
 if view is None and MODE == "local":
-    st.warning("No finished run yet. Use **Run** in the sidebar to analyse a week.")
+    st.warning("No finished run yet. Use **Fetch & analyse** in the sidebar.")
 
 
 # --------------------------------------------------------------------------------------
@@ -178,25 +181,56 @@ def show_result(code: int, output: str, success: str) -> None:
         st.code(output[-8000:] or "(no output)", language="text")
 
 
+ANALYSED = "Note ready. Read it, then publish it from the Delivery tab."
+
+
+def analyse(week_args: list[str]) -> None:
+    with st.spinner("Running stages 1-8…"):
+        code, output = run_cli("run", "--dry-run", *week_args)
+    if code != 0:
+        show_result(code, output, "")
+        return
+    # Rerun so the new run is listed and selected; keep the output for after the rerun.
+    st.session_state["last_result"] = (code, output)
+    st.cache_data.clear()
+    st.rerun()
+
+
 if MODE == "local":
     with st.sidebar:
+        if "last_result" in st.session_state:
+            show_result(*st.session_state.pop("last_result"), ANALYSED)
         st.divider()
-        st.subheader("Run")
+        st.subheader("Run this week")
+        st.caption(
+            "1. Fetch & analyse — publishes nothing.  \n"
+            "2. Read the note and its checks.  \n"
+            "3. Publish from the **Delivery** tab."
+        )
         week = st.text_input("ISO week", placeholder="default: last complete week")
         week_args = ["--week", week.strip()] if week.strip() else []
-        if st.button("Fetch reviews", width="stretch", help="pulse fetch"):
-            with st.spinner("Fetching public Play Store reviews…"):
-                show_result(*run_cli("fetch", *week_args), "Export written to data/raw/.")
         if st.button(
-            "Analyse (dry run)",
+            "Fetch & analyse",
+            type="primary",
             width="stretch",
-            help="pulse run --dry-run: stages 1-8, writes the note, publishes nothing.",
+            help="pulse fetch, then pulse run --dry-run (stages 1-8).",
         ):
-            with st.spinner("Running stages 1-8…"):
-                code, output = run_cli("run", "--dry-run", *week_args)
-            show_result(code, output, "New run ready. Pick it from the Run list above.")
-            if code == 0:
-                st.cache_data.clear()
+            with st.spinner("Fetching public Play Store reviews…"):
+                code, output = run_cli("fetch", *week_args)
+            if code != 0:
+                show_result(code, output, "")
+            else:
+                analyse(week_args)
+        with st.expander("One step at a time"):
+            if st.button("Fetch reviews", width="stretch", help="pulse fetch"):
+                with st.spinner("Fetching public Play Store reviews…"):
+                    show_result(*run_cli("fetch", *week_args), "Export written to data/raw/.")
+            if st.button(
+                "Analyse (dry run)",
+                width="stretch",
+                help="pulse run --dry-run: stages 1-8, writes the note, publishes nothing.",
+            ):
+                analyse(week_args)
 
 
 # --------------------------------------------------------------------------------------
@@ -466,6 +500,18 @@ if view is not None:
                     )
                 show_result(code, output, "Done. Check the Doc and your Gmail Drafts.")
                 st.cache_data.clear()
+                if code == 0 and target == "live":
+                    # The public dashboard's copy. Writing it is local; pushing stays manual.
+                    code, output = run_cli("snapshot", "--run-dir", str(view.run_dir))
+                    written = f"Snapshot written to snapshots/{view.iso_week}.json."
+                    show_result(code, output, written)
+                    if code == 0:
+                        st.markdown("To update the public dashboard, push it:")
+                        st.code(
+                            f'git add snapshots && git commit -m "snapshot: {view.iso_week}" '
+                            "&& git push origin master:main",
+                            language="bash",
+                        )
 
     # -- Health & settings -------------------------------------------------------------
     with tabs[4]:

@@ -9,6 +9,7 @@ snapshot is refused rather than shown.
 from __future__ import annotations
 
 import json
+import subprocess
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -217,3 +218,21 @@ def test_the_local_view_renders_with_publishing_behind_a_confirmation(
     assert not app.exception
     publish = next(b for b in app.button if "Publish" in b.label)
     assert publish.disabled, "publishing must wait for the confirmation checkbox"
+    assert any(b.label == "Fetch & analyse" for b in app.button)
+
+
+def test_the_run_button_publishes_nothing(run_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fetch & analyse is a dry run: the only path to the Doc is the confirmed Publish."""
+    app = _app(monkeypatch, PULSE_UI_MODE="local", PULSE_UI_RUNS=str(run_dir.parent))
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
+        calls.append(cmd[3:])  # drop `python -m pulse`
+        return subprocess.CompletedProcess(cmd, 0, "ok", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    next(b for b in app.button if b.label == "Fetch & analyse").click().run()
+
+    assert not app.exception
+    assert [call[:2] for call in calls] == [["fetch"], ["run", "--dry-run"]]
+    assert not any("--mcp" in call for call in calls)

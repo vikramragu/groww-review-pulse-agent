@@ -1,6 +1,6 @@
 # Runbook
 
-How to run the weekly pulse, schedule it, and recover when something fails. For setup, see
+How to run the weekly pulse and recover when something fails. For setup, see
 the [README](../README.md). For the full failure table, see
 [architecture.md §15](architecture.md).
 
@@ -8,6 +8,19 @@ the [README](../README.md). For the full failure table, see
 
 A week runs Monday to Sunday (ISO weeks). Run on Monday or later, so the target week, by
 default the last complete one, is finished.
+
+A person starts every run, nothing is scheduled. There are two ways to do it, and both
+call the same `pulse` commands.
+
+**From the dashboard** (`streamlit run frontend/streamlit_app.py`):
+
+1. Sidebar → **Fetch & analyse**: fetches reviews and writes the note. Publishes nothing.
+2. Read the note and its six checks on the **Weekly pulse** tab.
+3. **Delivery** tab → tick the confirmation → **Publish to Doc + create draft**. On
+   success it also writes `snapshots/<week>.json` and shows the `git push` command for the
+   public dashboard.
+
+**From the terminal:**
 
 ```bash
 cd /path/to/agent-mcp && source .venv/bin/activate
@@ -36,19 +49,13 @@ Then, before anything reaches anyone:
 
 If the week shows `skipped`, it was already published to this doc. That's intended.
 
-## Scheduling
+## Why there is no schedule
 
-There is no built-in scheduler; use cron (or launchd on a Mac). Run on Monday morning, so
-the review is in your Drafts when you start work:
-
-```cron
-# m  h  dom mon dow  command
-30   7  *   *   1    cd /path/to/agent-mcp && .venv/bin/pulse fetch && .venv/bin/pulse run >> runs/cron.log 2>&1
-```
-
-- `.env` is read from the working directory, hence the `cd`.
-- A Mac must be awake at that time. launchd catches up after sleep; cron does not.
-- A scheduled run still only creates a **draft**. Someone has to read and send it.
+Runs are started by hand on purpose: someone reads the note before it is published, and
+nothing needs to run on a server. A schedule can be added later without code changes,
+because the CLI is the whole interface (cron on a machine that is on, or a scheduled CI
+job). A scheduled run would need the publish record in `runs/` and `.cache/` kept between
+runs, otherwise a re-run duplicates the week.
 
 ## Checks worth doing now and then
 

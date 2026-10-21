@@ -186,9 +186,12 @@ delivery, and health and settings.
 | --- | --- | --- |
 | Data | Any run in `runs/` | The latest `snapshots/<week>.json` |
 | Checks | Recomputed against the candidate pools | Recomputed on load; SHA-256 must match; verbatim recorded at export |
-| Actions | Fetch reviews, analyse a week (dry run), publish to the Doc + draft (behind a confirmation), run `pulse doctor` | None: read-only |
+| Actions | **Fetch & analyse** (publishes nothing), then publish to the Doc + draft behind a confirmation, which also writes the snapshot; run `pulse doctor` | None: read-only |
 
-Buttons call the `pulse` CLI, so the dashboard and the terminal can't disagree.
+Buttons call the `pulse` CLI, so the dashboard and the terminal can't disagree. Nothing is
+scheduled: a week runs when someone presses the button or types `pulse run`
+([runbook](docs/runbook.md#every-week)). Local mode turns on when `runs/` has a finished
+run or a `.env` exists.
 `PULSE_UI_MODE=snapshot` previews the public view locally. The app lives in [frontend/](frontend/).
 
 **Updating the public view.** After a week is published:
