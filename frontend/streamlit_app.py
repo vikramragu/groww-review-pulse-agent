@@ -52,6 +52,10 @@ NEUTRAL = {"light": "#8a8984", "dark": "#7c7b76"}
 SINGLE = {"light": "#2a78d6", "dark": "#3987e5"}
 
 st.set_page_config(page_title="Groww Review Pulse", page_icon="📊", layout="wide")
+st.markdown(
+    f"<style>{(Path(__file__).parent / 'sea_glass.css').read_text(encoding='utf-8')}</style>",
+    unsafe_allow_html=True,
+)
 
 
 def theme_mode() -> str:
@@ -282,12 +286,14 @@ if view is not None:
         left, right = st.columns([3, 2], gap="large")
         with left:
             st.subheader("The note")
-            with st.container(border=True):
+            with st.container(key="glass-frost-note"):
                 st.markdown(view.markdown)
         with right:
             st.subheader("Checks")
-            for check in view.checks:
-                st.markdown(f"{'✅' if check.ok else '❌'} **{check.name}** — {check.detail}")
+            stone = "kelly" if all(check.ok for check in view.checks) else "coral"
+            with st.container(key=f"glass-{stone}-checks"):
+                for check in view.checks:
+                    st.markdown(f"{'✅' if check.ok else '❌'} **{check.name}** — {check.detail}")
             st.caption(
                 "The same gate the pipeline runs before anything is published. "
                 "A note that fails any check is never sent to the Doc or Gmail."
@@ -326,22 +332,24 @@ if view is not None:
         )
 
         st.subheader("Top themes")
-        for summary in view.note.top_themes:
-            with st.container(border=True):
+        for index, summary in enumerate(view.note.top_themes):
+            with st.container(key=f"glass-cornflower-theme-{index}"):
                 st.markdown(f"**{THEME_LABELS[summary.theme]}** — {summary.summary}")
                 st.caption(figures_text(summary))
 
         st.subheader("What users said")
-        for quote in view.note.quotes:
-            with st.container(border=True):
+        for index, quote in enumerate(view.note.quotes):
+            with st.container(key=f"glass-aqua-quote-{index}"):
                 st.markdown(f"> {quote.text}")
                 st.caption(f"{quote.rating}★ · {THEME_LABELS[quote.theme]}")
 
         st.subheader("What to do next")
         for index, action in enumerate(view.note.actions, start=1):
-            st.markdown(
-                f"{index}. **{action.action}** ({THEME_LABELS[action.theme]}) — {action.rationale}"
-            )
+            with st.container(key=f"glass-kelly-action-{index}"):
+                st.markdown(
+                    f"{index}. **{action.action}** ({THEME_LABELS[action.theme]}) — "
+                    f"{action.rationale}"
+                )
 
     # -- Review statistics -------------------------------------------------------------
     with tabs[2]:
@@ -355,7 +363,9 @@ if view is not None:
                 "Share of each week's substantive reviews. The last week is the one the "
                 "note reports on."
             )
-            hover = alt.selection_point(fields=["iso_week"], nearest=True, on="pointerover")
+            hover = alt.selection_point(
+                fields=["iso_week"], nearest=True, on="pointerover", empty=False
+            )
             base = alt.Chart(weekly).encode(
                 x=alt.X("iso_week:N", title=None, axis=alt.Axis(labelAngle=0)),
                 y=alt.Y("Share:Q", title=None, axis=alt.Axis(format="%", grid=True)),

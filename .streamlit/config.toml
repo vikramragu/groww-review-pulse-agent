@@ -1,0 +1,10 @@
+# Sea glass: always the white page; the stones are in frontend/sea_glass.css.
+[theme]
+base = "light"
+primaryColor = "#2c5bbf"
+backgroundColor = "#fafaf7"
+secondaryBackgroundColor = "#eef1f1"
+textColor = "#1b2a2f"
+
+[client]
+toolbarMode = "viewer"
