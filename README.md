@@ -11,14 +11,17 @@ reached through a separate server,
 [google-workspace-mcp](https://github.com/vikramragu/Mail-Docs-MCP-Server), which owns
 OAuth and the Google API calls.
 
-```text
-Play Store export ──▶ agent (this repo) ──MCP over HTTPS + bearer token──▶ google-workspace-mcp ──▶ Google Docs / Gmail
-                      stages 1-8: analysis                                   (Railway)
-                      stages 9-10: publish
-```
+**The output, in short:** a product team gets one page each week saying which three
+problems users complain about most, how much each grew against the previous 11 weeks,
+three real user quotes, and three suggested actions. Every number is computed by code, and
+every quote is checked word for word against a real review.
 
 ## Contents
 
+- [Architecture](#architecture)
+- [Why it is built this way](#why-it-is-built-this-way)
+- [Tech stack](#tech-stack)
+- [Three ways to run it](#three-ways-to-run-it)
 - [Install](#install)
 - [Configure](#configure)
 - [Get review data](#get-review-data)
@@ -28,6 +31,139 @@ Play Store export ──▶ agent (this repo) ──MCP over HTTPS + bearer toke
 - [Troubleshoot](#troubleshoot)
 - [Development](#development)
 - [Documentation](#documentation)
+
+## Architecture
+
+### System
+
+Two repositories, deployed separately. The agent decides *what* to say; the MCP server is
+the only thing that can touch Google.
+
+```mermaid
+flowchart LR
+    PS["Google Play Store<br/>public reviews"]
+    GROQ["Groq LLM<br/>openai/gpt-oss-120b"]
+
+    subgraph AGENT["groww-review-pulse-agent (this repo, Python)"]
+        direction TB
+        TRIG["Triggers<br/>CLI · local dashboard · GitHub Actions (manual)"]
+        PIPE["10-stage pipeline"]
+        CLIENT["MCP client<br/>discovery · contract check · adapters"]
+        TRIG --> PIPE --> CLIENT
+    end
+
+    subgraph SERVER["Mail-Docs-MCP-Server (TypeScript, Railway)"]
+        TOOLS["MCP tools<br/>docs_get_info · docs_append_content · gmail_create_draft"]
+    end
+
+    DOC["Google Doc<br/>one section per week"]
+    DRAFT["Gmail draft<br/>never sent"]
+    SNAP["snapshots/week.json<br/>committed to git"]
+    UI["Public dashboard<br/>Streamlit Cloud, read-only"]
+
+    PS -- "pulse fetch" --> PIPE
+    PIPE -- "stages 4 and 6 only" --> GROQ
+    CLIENT -- "MCP over HTTPS<br/>bearer token" --> TOOLS
+    TOOLS -- "OAuth" --> DOC
+    TOOLS -- "OAuth" --> DRAFT
+    PIPE -- "pulse snapshot" --> SNAP --> UI
+```
+
+### Pipeline
+
+Each stage writes an artifact to `runs/<week>-<nn>/`, so any stage can be inspected or
+replayed. Only two stages use the LLM; everything else is ordinary code.
+
+```mermaid
+flowchart LR
+    S1["1 Ingest<br/>load export"] --> S2["2 Normalize<br/>dedupe, window,<br/>English, >8 words"]
+    S2 --> S3["3 Scrub<br/>remove personal<br/>details"]
+    S3 --> S4["4 Classify<br/>5 fixed themes<br/>(LLM, cached)"]
+    S4 --> S5["5 Analyse<br/>count, compare with<br/>prior 11 weeks, rank"]
+    S5 --> S6["6 Draft<br/>headline, summaries,<br/>actions (LLM)"]
+    S6 --> S7{"7 Validate<br/>the gate"}
+    S7 -- "fails: redraft,<br/>max 3 attempts" --> S6
+    S7 -- "passes" --> S8["8 Render<br/>pulse.md"]
+    S8 --> S9["9 Append<br/>to Google Doc"]
+    S9 --> S10["10 Create<br/>Gmail draft"]
+
+    classDef llm fill:#c6d7f2,stroke:#2c5bbf,color:#1b2a2f
+    classDef gate fill:#f4cf86,stroke:#8a4a24,color:#1b2a2f
+    classDef mcp fill:#bfe6d6,stroke:#1d7f80,color:#1b2a2f
+    class S4,S6 llm
+    class S7 gate
+    class S9,S10 mcp
+```
+
+Blue: the LLM. Amber: the validation gate. Green: publishing through MCP.
+
+**Stage 7, the gate,** checks before anything is published:
+
+| Check | Rule |
+| --- | --- |
+| `word_limit` | At most 250 words |
+| `three_three_three` | Exactly 3 themes, 3 quotes, 3 actions |
+| `quotes_verbatim` | Each quote matches a real (scrubbed) review character for character |
+| `no_pii` | No emails, phone numbers, account IDs or names |
+| `figures_from_data` | No number written by the model; figures are printed by code |
+| `grounded_in_themes` | Each action names one of the three themes on the page |
+
+A note that fails is redrafted with the failure named; after three failures nothing is
+published.
+
+## Why it is built this way
+
+The full record, with alternatives considered, is in
+[docs/architecture.md §2](docs/architecture.md) and §19. The decisions that shape the
+system:
+
+| Decision | Why |
+| --- | --- |
+| **Code enforces every rule; the LLM is used only for judgement** (stages 4 and 6) | A model asked to keep to 250 words, quote exactly or avoid personal data will drift. Counting, ranking, the figures and the checks are code, so they are repeatable and testable. |
+| **A fixed set of 5 themes**, plus "unclassified" | Themes invented fresh each week can't be compared week to week, which makes trends meaningless. A fixed list makes "+5.6 points vs the prior 11 weeks" a real number, and caps the note at 5 themes by construction. |
+| **A doubtful label becomes "unclassified", never a guess** | A wrong theme silently inflates a trend. Unclassified reviews count toward the total but never toward a theme. |
+| **Figures printed by code, hidden from the model** | A model restating counts can get them wrong, and nobody would notice. The model writes no digits at all; code prints the figures and the gate checks it. |
+| **Personal details removed before any model call** (stage 3) | Reviews can contain phone numbers, emails or account IDs. Nothing identifying reaches the LLM, the Doc or git. |
+| **Google access lives in a separate MCP server** | The agent holds no Google credential and has no Google SDK. Analysis and Google auth ship, deploy and fail independently, and the agent depends on a versioned tool contract, not on server code. |
+| **Drafts only; the agent refuses any send tool** | A person reads every email before it goes out. The server also runs with sending disabled, so a leaked token can't send mail as the owner. |
+| **Check the server before spending on the LLM** | A live run connects, checks the server's name, version and tools against the contract, and reads the doc, all before stage 1. A wrong token or a server that is down costs nothing. |
+| **Re-runs don't duplicate** | A week already in the doc, or already drafted for it, is skipped. `--republish` overrides on purpose. |
+| **Labels cached on disk** | The 12-week window overlaps about 90% between weeks, so a weekly run classifies only new reviews. |
+| **Every stage writes an artifact** | Any failure can be inspected and replayed from that stage (`--from 6`, `--from 10`) without paying for the earlier ones again. |
+| **Runs are started by a person, not on a schedule** | Someone decides when a week goes out. GitHub's Run workflow covers "no laptop needed" without an unattended job. |
+| **Public dashboard reads a verified snapshot** | The public app never contacts the MCP server and holds no secrets. The snapshot withholds review IDs and private links, carries a SHA-256, and is re-checked on load. |
+| **An LLM interface, not a vendor** (`LlmPort`) | Groq lets the project run without per-token spend; switching provider is a config change. |
+
+## Tech stack
+
+| Layer | Technology | Used for |
+| --- | --- | --- |
+| Language | Python 3.11+ | The whole agent |
+| CLI | [Typer](https://typer.tiangolo.com/) | `pulse fetch`, `run`, `doctor`, `snapshot`, `validate`, `contract check` |
+| Data models | [Pydantic v2](https://docs.pydantic.dev/) | Typed reviews, stats and the note; validating the model's JSON |
+| LLM | [Groq](https://console.groq.com/), `openai/gpt-oss-120b` | Stage 4 (classify, batches of 40, temperature 0) and stage 6 (draft) |
+| Review data | [google-play-scraper](https://pypi.org/project/google-play-scraper/) | `pulse fetch` only, never the pipeline |
+| MCP client | [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) 2.x | HTTPS with a bearer token, or stdio for the in-repo stub |
+| Contract checks | [jsonschema](https://python-jsonschema.readthedocs.io/) | Every server reply against `contract/google-workspace-mcp-0.1.json` |
+| Dashboard | [Streamlit](https://streamlit.io/), Altair, pandas | Local (with actions) and public (read-only) views |
+| Tests | pytest, pytest-asyncio | 869 tests, fully offline, including a stub MCP server and a golden end-to-end run |
+| Quality | Ruff (lint and format), mypy | Enforced in CI |
+| CI and runs | GitHub Actions | `ci.yml` on every push; `weekly-pulse.yml` on demand |
+| Hosting | Streamlit Community Cloud | The public dashboard |
+| **Server** (other repo) | TypeScript, Node.js, Google Docs and Gmail APIs, OAuth 2.0, Railway | The MCP tools the agent calls |
+
+## Three ways to run it
+
+All three call the same `pulse` commands, so they can't disagree. None runs on a schedule.
+
+| Way | Where | How |
+| --- | --- | --- |
+| **CLI** | Any machine with the secrets | `pulse fetch` then `pulse run` |
+| **Local dashboard** | Your machine | **Fetch & analyse**, read the note, then **Publish** behind a confirmation |
+| **GitHub Actions** | GitHub, no machine needed | Actions → **Weekly pulse** → Run workflow (tick *publish* to send it to the Doc and Gmail) |
+
+The public dashboard on Streamlit Cloud is read-only: it shows the latest snapshot and has
+no buttons, because a public button could publish to the team's Doc.
 
 ## Install
 
