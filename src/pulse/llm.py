@@ -37,6 +37,8 @@ log = pulse_logging.get_logger("llm")
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
 GROQ_API_KEY_ENV = "GROQ_API_KEY"
+#: Rate-limit retries per call. The SDK backs off between them (retry-after, else 0.5-8s).
+GROQ_MAX_RETRIES = 10
 ANTHROPIC_API_KEY_ENVS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 
 #: Published per-million-token prices, for the ledger's cost estimate only. Rates move and
@@ -308,7 +310,10 @@ class GroqLlm:
                 "The `groq` package is not installed. Run: pip install -e '.[dev]'"
             ) from exc
 
-        self._client = Groq(api_key=key, timeout=timeout)
+        # The free tier allows 8,000 tokens per minute, and a classification batch is about
+        # half of that, so 429s are routine on a cold cache. The SDK waits as the response's
+        # retry-after asks; its default of 2 retries ran out mid-corpus on a fresh runner.
+        self._client = Groq(api_key=key, timeout=timeout, max_retries=GROQ_MAX_RETRIES)
 
     def generate_json(
         self,

@@ -45,7 +45,7 @@ env:
 jobs:
   pulse:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60 # a cold cache labels ~1,700 reviews at 8k tokens/min: ~25 min
     steps:
       - uses: actions/checkout@v4
 
