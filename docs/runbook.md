@@ -9,8 +9,18 @@ the [README](../README.md). For the full failure table, see
 A week runs Monday to Sunday (ISO weeks). Run on Monday or later, so the target week, by
 default the last complete one, is finished.
 
-A person starts every run, nothing is scheduled. There are two ways to do it, and both
+A person starts every run, nothing is scheduled. There are three ways to do it, and all
 call the same `pulse` commands.
+
+**From GitHub** (no laptop needed): repository → **Actions** → **Weekly pulse** → **Run
+workflow**. Leave the week empty for the last complete week; tick **publish** to append it
+to the Doc and create the Gmail draft. It fetches, analyses, publishes, then commits
+`snapshots/<week>.json`, and Streamlit Cloud redeploys. If publishing fails (an expired
+Google login, say) the dashboard is still updated and the run is marked failed. A week whose
+snapshot already says it was published is not published again unless **republish** is
+ticked. It needs three repository secrets (Settings → Secrets and variables → Actions):
+`GROQ_API_KEY`, `PULSE_MCP_TOKEN`, `PULSE_RECIPIENT`. The logs are public, so the workflow
+prints only counts and outcomes.
 
 **From the dashboard** (`streamlit run frontend/streamlit_app.py`):
 
@@ -51,11 +61,10 @@ If the week shows `skipped`, it was already published to this doc. That's intend
 
 ## Why there is no schedule
 
-Runs are started by hand on purpose: someone reads the note before it is published, and
-nothing needs to run on a server. A schedule can be added later without code changes,
-because the CLI is the whole interface (cron on a machine that is on, or a scheduled CI
-job). A scheduled run would need the publish record in `runs/` and `.cache/` kept between
-runs, otherwise a re-run duplicates the week.
+Runs are started by hand on purpose: someone decides when a week goes out. The GitHub
+workflow can be made weekly by adding a `schedule:` trigger to
+`.github/workflows/weekly-pulse.yml`. While the Google OAuth app stays in Testing status its
+login expires every 7 days, so an unattended weekly publish would fail most weeks.
 
 ## Checks worth doing now and then
 

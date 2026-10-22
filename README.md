@@ -116,6 +116,10 @@ pulse run --week 2026-W41       # a specific ISO week
 pulse run --mcp stub            # publish to the in-repo stub server instead
 ```
 
+**Without a laptop:** GitHub → Actions → **Weekly pulse** → Run workflow does the same
+fetch, analyse and (if ticked) publish, then updates the public dashboard. It runs only when
+someone presses it. Setup and behaviour: [runbook](docs/runbook.md#every-week).
+
 Before stage 1, a live run connects to the server, checks its name, version and tools, and
 reads the configured doc. A wrong token, a missing doc or a server that is down therefore
 stops the run **before** any model call costs money.
@@ -189,7 +193,7 @@ delivery, and health and settings.
 | Actions | **Fetch & analyse** (publishes nothing), then publish to the Doc + draft behind a confirmation, which also writes the snapshot; run `pulse doctor` | None: read-only |
 
 Buttons call the `pulse` CLI, so the dashboard and the terminal can't disagree. Nothing is
-scheduled: a week runs when someone presses the button or types `pulse run`
+scheduled: a week runs when someone presses a button (here or GitHub's Run workflow) or types `pulse run`
 ([runbook](docs/runbook.md#every-week)). Local mode turns on when `runs/` has a finished
 run or a `.env` exists.
 `PULSE_UI_MODE=snapshot` previews the public view locally. The app lives in [frontend/](frontend/).
